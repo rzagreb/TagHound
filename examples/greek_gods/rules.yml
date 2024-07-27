@@ -1,0 +1,147 @@
+- id: role/god
+  label: God
+  weight: 10
+  and:
+    - key: description
+      op: "~"
+      value: God
+    - key: description
+      op: "!~"
+      value: Goddess
+    - or:
+        - key: description
+          op: "!~"
+          value: 
+            - fake
+            - "false"
+
+- id: role/goddess
+  label: Goddess
+  weight: 10
+  and:
+    - key: description
+      op: "~"
+      value: Goddess
+
+- id: domain/sky
+  label: Sky Domain
+  weight: 8
+  and:
+    - key: description
+      op: "~"
+      value: sky
+
+- id: domain/sea
+  label: Sea Domain
+  weight: 8
+  and:
+    - key: description
+      op: "~"
+      value: sea
+
+- id: domain/underworld
+  label: Underworld Domain
+  weight: 8
+  and:
+    - key: description
+      op: "~"
+      value: underworld
+
+- id: domain/wisdom
+  label: Wisdom Domain
+  weight: 8
+  and:
+    - key: description
+      op: "~"
+      value: wisdom
+
+- id: zeus
+  label: Contains Zeus
+  weight: 12
+  and:
+    - key: name
+      op: "="
+      value: Zeus
+
+- id: zeus_or_hera
+  label: Contains Zeus or Hera
+  weight: 12
+  or:
+    - key: name
+      op: "="
+      value: Zeus
+    - key: name
+      op: "="
+      value: Hera
+
+- id: description/god
+  label: Contains God
+  weight: 10
+  and:
+    - key: description
+      op: "~"
+      value: God
+
+- id: description/thunder
+  label: Thunder Mention
+  weight: 9
+  and:
+    - key: description
+      op: "~"
+      value: thunder
+
+- id: description/ruler
+  label: Ruler Mention
+  weight: 9
+  and:
+    - key: description
+      op: "~"
+      value: ruler
+
+- id: description/earthquake
+  label: Earthquake Mention
+  weight: 9
+  and:
+    - key: description
+      op: "~"
+      value: earthquake
+
+- id: description/dead
+  label: Dead Mention
+  weight: 9
+  and:
+    - key: description
+      op: "~"
+      value: dead
+
+- id: description/protector
+  label: Protector Mention
+  weight: 9
+  and:
+    - key: description
+      op: "~"
+      value: protects
+
+- id: description/music
+  label: Music Mention
+  weight: 9
+  and:
+    - key: description
+      op: "~"
+      value: music
+
+- id: description/hunt
+  label: Hunt Mention
+  weight: 9
+  and:
+    - key: description
+      op: "~"
+      value: hunt
+
+- id: description/fire
+  label: Fire Mention
+  weight: 9
+  and:
+    - key: description
+      op: "~"
+      value: fire

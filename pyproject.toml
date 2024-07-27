@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "taghound"
+version = "0.1.11"
+description = "TagHound: A Python library for managing and evaluating tag rules using scalar and vector operations. Supports YAML and JSON rule loading."
+authors = ["Roman Zagrebnev"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/rzagreb/TagHound"
+
+[tool.poetry.dependencies]
+python = ">=3.9"
+pyyaml = ">=6.0"
+pandas = ">=2.0,<3.0"
+
+[tool.poetry.group.dev.dependencies]
+line-profiler = ">=4.1.3,<5"
+memory-profiler = ">=0.61.0"
+ipykernel = ">=6.29.5,<7"
+ruff = ">=0.0.262"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
