@@ -6,6 +6,9 @@ authors = ["Roman Zagrebnev"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/rzagreb/TagHound"
+repository = "https://github.com/rzagreb/TagHound"
+documentation = "https://github.com/rzagreb/TagHound#readme"
+keywords = ["tags", "rules", "YAML", "JSON", "Python"]
 
 [tool.poetry.dependencies]
 python = ">=3.9"
