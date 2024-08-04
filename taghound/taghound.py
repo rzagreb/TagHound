@@ -129,15 +129,29 @@ class TagHound:
     def rules(self) -> list[TagRule]:
         return self.__rules
 
+    @property
+    def rule_id_to_weight_map(self) -> dict[str, float]:
+        return self.__rule_id_to_weight_map
+
+    @property
+    def rule_id_to_label_map(self) -> dict[str, str]:
+        return self.__rule_id_to_label_map
+
     def set_rules(self, rules: list[TagRule]) -> None:
         self.__rules = rules
         self.__required_fields = set().union(
             *(rule.required_fields for rule in self.__rules)
         )
 
+        self.__rule_id_to_weight_map = {rule.id: rule.weight for rule in self.__rules}
+        self.__rule_id_to_label_map = {rule.id: rule.label for rule in self.__rules}
+
     def add_rule(self, rule: TagRule) -> None:
         self.__rules.append(rule)
         self.__required_fields.update(rule.required_fields)
+
+        self.__rule_id_to_weight_map[rule.id] = rule.weight
+        self.__rule_id_to_label_map[rule.id] = rule.label
 
     @classmethod
     def rules_from_yaml(
