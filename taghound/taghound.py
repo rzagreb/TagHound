@@ -4,7 +4,7 @@ from typing import Any, Mapping, Optional, Union
 
 import pandas as pd
 
-from taghound.models import TagFound, TagRule
+from taghound.models import TagRule
 from taghound.serializers import to_tag_rule
 
 
@@ -15,7 +15,7 @@ class TagHound:
     def find_all_tags(
         self,
         data: Mapping[str, Any],
-        multi_threaded: bool = True,
+        multi_threaded: bool = False,
         thread_exec_params: Optional[dict] = None,
     ) -> tuple[str, ...]:
         """Find all tags in the data
@@ -62,7 +62,7 @@ class TagHound:
 
             thread_exec_params = thread_exec_params or {}
 
-            tags = []
+            tag_ids: list[str] = []
             with ThreadPoolExecutor(**thread_exec_params) as executor:
                 future_to_rule = {}
                 for rule in self.__rules:
@@ -71,11 +71,11 @@ class TagHound:
                     future_to_rule[executor.submit(rule.scalar_check, data)] = rule
 
                 for future in as_completed(future_to_rule):
-                    rule = future_to_rule[future]
+                    rule: TagRule = future_to_rule[future]
                     if future.result():
-                        tags.append(TagFound(id=rule.id, rule=rule))
+                        tag_ids.append(rule.id)
 
-            return tuple(tags)
+            return tuple(tag_ids)
         else:
             return tuple(rule.id for rule in self.__rules if rule.scalar_check(data))  # type: ignore
 
@@ -83,6 +83,7 @@ class TagHound:
         self,
         data: Union[pd.DataFrame, list[Mapping[str, Any]]],
         output_format: str = "list",
+        output_column_name: str = "tags",
     ) -> pd.DataFrame:
         """Find tags in the data using vectorized operations
         NOTE: about 94% faster than scalar methods for 1,000 rows with 1,000 tags
@@ -115,7 +116,7 @@ class TagHound:
             tags_series = tags_df.apply(
                 lambda row: [tag for tag, match in row.items() if match], axis=1
             )
-            df["tags"] = tags_series
+            df[output_column_name] = tags_series
             return df
         elif output_format == "columns":
             result_df = pd.concat([df, tags_df], axis=1)
@@ -129,15 +130,29 @@ class TagHound:
     def rules(self) -> list[TagRule]:
         return self.__rules
 
+    @property
+    def rule_id_to_weight_map(self) -> dict[str, float]:
+        return self.__rule_id_to_weight_map
+
+    @property
+    def rule_id_to_label_map(self) -> dict[str, str]:
+        return self.__rule_id_to_label_map
+
     def set_rules(self, rules: list[TagRule]) -> None:
         self.__rules = rules
         self.__required_fields = set().union(
             *(rule.required_fields for rule in self.__rules)
         )
 
+        self.__rule_id_to_weight_map = {rule.id: rule.weight for rule in self.__rules}
+        self.__rule_id_to_label_map = {rule.id: rule.label for rule in self.__rules}
+
     def add_rule(self, rule: TagRule) -> None:
         self.__rules.append(rule)
         self.__required_fields.update(rule.required_fields)
+
+        self.__rule_id_to_weight_map[rule.id] = rule.weight
+        self.__rule_id_to_label_map[rule.id] = rule.label
 
     @classmethod
     def rules_from_yaml(
