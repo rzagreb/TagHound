@@ -4,7 +4,7 @@ from typing import Any, Mapping, Optional, Union
 
 import pandas as pd
 
-from taghound.models import TagFound, TagRule
+from taghound.models import TagRule
 from taghound.serializers import to_tag_rule
 
 
@@ -15,7 +15,7 @@ class TagHound:
     def find_all_tags(
         self,
         data: Mapping[str, Any],
-        multi_threaded: bool = True,
+        multi_threaded: bool = False,
         thread_exec_params: Optional[dict] = None,
     ) -> tuple[str, ...]:
         """Find all tags in the data
@@ -62,7 +62,7 @@ class TagHound:
 
             thread_exec_params = thread_exec_params or {}
 
-            tags = []
+            tag_ids: list[str] = []
             with ThreadPoolExecutor(**thread_exec_params) as executor:
                 future_to_rule = {}
                 for rule in self.__rules:
@@ -71,11 +71,11 @@ class TagHound:
                     future_to_rule[executor.submit(rule.scalar_check, data)] = rule
 
                 for future in as_completed(future_to_rule):
-                    rule = future_to_rule[future]
+                    rule: TagRule = future_to_rule[future]
                     if future.result():
-                        tags.append(TagFound(id=rule.id, rule=rule))
+                        tag_ids.append(rule.id)
 
-            return tuple(tags)
+            return tuple(tag_ids)
         else:
             return tuple(rule.id for rule in self.__rules if rule.scalar_check(data))  # type: ignore
 

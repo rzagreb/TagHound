@@ -28,9 +28,3 @@ class TagRule:
 
     data: Mapping[str, Any] = field(compare=False, default_factory=dict)
     """ The original data used to create the TagRule object. """
-
-
-@dataclass(frozen=True, eq=True)
-class TagFound:
-    id: str
-    rule: TagRule

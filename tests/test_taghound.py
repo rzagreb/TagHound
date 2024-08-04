@@ -10,7 +10,7 @@ import context  # type: ignore  # noqa: F401
 import yaml
 
 from taghound.constants import ComparisonKey, LogicalOperator, RuleKey
-from taghound.models import TagFound, TagRule
+from taghound.models import TagRule
 from taghound.taghound import TagHound
 
 
@@ -56,9 +56,7 @@ class TestTagHound(unittest.TestCase):
             "clearance_required": "true",
             "clearance_level": "Top Secret",
         }
-        expected_tags = (
-            TagFound(id="sector_group/advanced_filtering2", rule=self.rules[0]),
-        )
+        expected_tags = ("sector_group/advanced_filtering2",)
         tags = self.th.find_all_tags(data)
         self.assertEqual(tags, expected_tags)
 
@@ -71,6 +69,40 @@ class TestTagHound(unittest.TestCase):
         }
         expected_tags = tuple()  # Because title contains "junior"
         tags = self.th.find_all_tags(data)
+        self.assertEqual(tags, expected_tags)
+
+        data = {
+            "description": "public sector",
+            "title": "senior developer",
+            "location": "Chicago",
+            "clearance_required": "false",
+            "clearance_level": "Top Secret",
+        }
+        expected_tags = tuple()  # Because location is not Washington or New York
+        tags = self.th.find_all_tags(data)
+        self.assertEqual(tags, expected_tags)
+
+    def test_find_all_tags_multithread(self):
+        data = {
+            "description": "government contract",
+            "title": "senior developer",
+            "location": "Washington",
+            "clearance_required": "true",
+            "clearance_level": "Top Secret",
+        }
+        expected_tags = ("sector_group/advanced_filtering2",)
+        tags = self.th.find_all_tags(data)
+        self.assertEqual(tags, expected_tags)
+
+        data = {
+            "description": "public sector",
+            "title": "junior developer",
+            "location": "New York",
+            "clearance_required": "false",
+            "clearance_level": "Top Secret",
+        }
+        expected_tags = tuple()  # Because title contains "junior"
+        tags = self.th.find_all_tags(data, multi_threaded=True)
         self.assertEqual(tags, expected_tags)
 
         data = {
