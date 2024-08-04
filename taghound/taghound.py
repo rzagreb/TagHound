@@ -83,6 +83,7 @@ class TagHound:
         self,
         data: Union[pd.DataFrame, list[Mapping[str, Any]]],
         output_format: str = "list",
+        output_column_name: str = "tags",
     ) -> pd.DataFrame:
         """Find tags in the data using vectorized operations
         NOTE: about 94% faster than scalar methods for 1,000 rows with 1,000 tags
@@ -115,7 +116,7 @@ class TagHound:
             tags_series = tags_df.apply(
                 lambda row: [tag for tag, match in row.items() if match], axis=1
             )
-            df["tags"] = tags_series
+            df[output_column_name] = tags_series
             return df
         elif output_format == "columns":
             result_df = pd.concat([df, tags_df], axis=1)
