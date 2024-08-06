@@ -64,8 +64,12 @@ ENV/
 
 # macos
 .DS_Store
-profiling
-support_scripts
+
+# Temporary files
+/profiling
+/support_scripts
+/PRIVATE_NOTES.md
 
 # ruff cache
 .ruff_cache/
+
