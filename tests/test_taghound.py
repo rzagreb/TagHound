@@ -426,6 +426,33 @@ class TestTagHound(unittest.TestCase):
                 TagHound.rules_from_json(tmp_file.name, version="2")
             os.remove(tmp_file.name)
 
+    def test_loading_rule_with_comments(self):
+        yaml_data = [
+            {
+                RuleKey.ID.value: "sector_group/advanced_filtering2",
+                RuleKey.LABEL.value: "Advanced Filtering 2",
+                RuleKey.WEIGHT.value: -150,
+                RuleKey.INFO.value: "This is a comment",
+                LogicalOperator.OR.value: [
+                    {
+                        LogicalOperator.AND.value: [
+                            {
+                                ComparisonKey.KEY.value: "description",
+                                ComparisonKey.OPERATOR.value: "~",
+                                ComparisonKey.VALUE.value: "(government contract|public sector)",
+                            }
+                        ]
+                    }
+                ],
+            }
+        ]
+
+        with tempfile.NamedTemporaryFile(delete=False, mode="w") as tmp_file:
+            yaml.dump(yaml_data, tmp_file)
+            tmp_file.close()
+            taghound = TagHound.rules_from_yaml(tmp_file.name)
+            self.assertAlmostEqual(taghound.rules[0].info, "This is a comment")  # type: ignore
+
 
 if __name__ == "__main__":
     unittest.main()

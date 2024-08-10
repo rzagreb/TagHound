@@ -38,6 +38,7 @@ def to_tag_rule(
     tag_name = rule_data[RuleKey.ID.value]
     weight = rule_data.get(RuleKey.WEIGHT.value, DEFAULT_WEIGHT)
     label = rule_data.get(RuleKey.LABEL.value, RuleKey.ID.value)
+    info = rule_data.get(RuleKey.INFO.value, None)
 
     # Validate
     if not isinstance(tag_name, str):
@@ -65,6 +66,7 @@ def to_tag_rule(
         id=tag_name,
         label=label,
         weight=weight,
+        info=info,
         required_fields=required_fields,
         scalar_check=create_scalar_function(rule_data) if add_scalar_func else None,
         vector_check=create_vector_function(rule_data) if add_vector_fn else None,

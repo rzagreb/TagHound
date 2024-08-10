@@ -53,6 +53,7 @@ class RuleKey(Enum):
     ID = "id"
     LABEL = "label"
     WEIGHT = "weight"
+    INFO = "info"
     ROOT_AND = LogicalOperator.AND.value
     ROOT_OR = LogicalOperator.OR.value
 
