@@ -20,6 +20,9 @@ class TagRule:
     required_fields: set[str] = field(compare=False)
     """ The required fields for the rule. """
 
+    info: Optional[str] = field(compare=False, default=None)
+    """ Internal comments for the rule. """
+
     scalar_check: Optional[PyEvalFn] = field(compare=False, default=None)
     """ Scalar function used to check if the rule is satisfied. """
 
