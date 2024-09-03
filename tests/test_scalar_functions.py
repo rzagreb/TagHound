@@ -5,6 +5,7 @@ import unittest
 import context  # type: ignore # noqa: F401
 
 from taghound.constants import (
+    DEFAULT_REGEX_MERGE_PATTERN,
     ComparisonKey,
     ComparisonOperator,
     LogicalOperator,
@@ -148,7 +149,9 @@ class TestMakeLogicOperationFunction(unittest.TestCase):
                 },
             ]
         }
-        condition_fn = _create_logic_function(params)
+        condition_fn = _create_logic_function(
+            params, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
+        )
         self.assertTrue(callable(condition_fn))
 
     def test_make_logic_operation_function_or(self):
@@ -166,7 +169,9 @@ class TestMakeLogicOperationFunction(unittest.TestCase):
                 },
             ]
         }
-        condition_fn = _create_logic_function(params)
+        condition_fn = _create_logic_function(
+            params, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
+        )
         self.assertTrue(callable(condition_fn))
 
     def test_make_logic_operation_function_invalid_operator(self):
@@ -180,7 +185,7 @@ class TestMakeLogicOperationFunction(unittest.TestCase):
             ]
         }
         with self.assertRaises(InvalidOperatorError):
-            _create_logic_function(params)  # type: ignore
+            _create_logic_function(params, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)  # type: ignore
 
 
 class TestMakeConditionFunctions(unittest.TestCase):
@@ -197,7 +202,9 @@ class TestMakeConditionFunctions(unittest.TestCase):
                 ComparisonKey.VALUE.value: 1990,
             },
         ]
-        condition_fns = _parse_conditions(elems)
+        condition_fns = _parse_conditions(
+            elems, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
+        )
         self.assertEqual(len(condition_fns), 2)
         for fn in condition_fns:
             self.assertTrue(callable(fn))
@@ -209,12 +216,12 @@ class TestMakeConditionFunctions(unittest.TestCase):
             ComparisonKey.VALUE.value: "python",
         }
         with self.assertRaises(TypeError):
-            _parse_conditions(elems)  # type: ignore
+            _parse_conditions(elems, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)  # type: ignore
 
     def test_make_condition_functions_empty_dict(self):
         elems = [{}]
         with self.assertRaises(ValueError):
-            _parse_conditions(elems)  # type: ignore
+            _parse_conditions(elems, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)  # type: ignore
 
 
 class TestMakeComparisonConditionFunction(unittest.TestCase):
@@ -223,6 +230,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "language",
             "python",
             ComparisonOperator.EQUAL.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"language": "python"}
@@ -235,6 +243,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "language",
             "python",
             ComparisonOperator.NOT_EQUAL.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"language": "python"}
@@ -247,6 +256,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "year",
             1990,
             ComparisonOperator.GREATER_THAN.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"year": 2000}
@@ -259,6 +269,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "year",
             1990,
             ComparisonOperator.GREATER_THAN_OR_EQUAL.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"year": 2000}
@@ -273,6 +284,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "year",
             2000,
             ComparisonOperator.LESS_THAN.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"year": 1990}
@@ -285,6 +297,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "year",
             2000,
             ComparisonOperator.LESS_THAN_OR_EQUAL.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"year": 1990}
@@ -299,6 +312,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "language",
             ["python", "java"],
             ComparisonOperator.IN.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"language": "python"}
@@ -311,6 +325,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "language",
             ["python", "java"],
             ComparisonOperator.NOT_IN.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"language": "python"}
@@ -323,6 +338,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "is_active",
             True,
             ComparisonOperator.IS.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"is_active": True}
@@ -335,6 +351,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "is_active",
             True,
             ComparisonOperator.IS_NOT.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
         data = {"is_active": True}
@@ -347,6 +364,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "text",
             "python",
             ComparisonOperator.REGEX_MATCH.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
 
@@ -361,6 +379,7 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
             "text",
             "python",
             ComparisonOperator.REGEX_NOT_MATCH.value,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(fn))
 
@@ -374,21 +393,27 @@ class TestMakeComparisonConditionFunction(unittest.TestCase):
 class TestValidateAndNormalizeComparisonConditionData(unittest.TestCase):
     def test_validate_and_normalize_comparison_condition_data_regex(self):
         value, operator = _validate_and_normalize_comparison_condition_data(
-            "python", ComparisonOperator.REGEX_MATCH
+            "python",
+            ComparisonOperator.REGEX_MATCH,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(value.match))
         self.assertEqual(operator, ComparisonOperator.REGEX_MATCH)
 
     def test_validate_and_normalize_comparison_condition_data_regex_list(self):
         value, operator = _validate_and_normalize_comparison_condition_data(
-            ["python", "java"], ComparisonOperator.REGEX_MATCH
+            ["python", "java"],
+            ComparisonOperator.REGEX_MATCH,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertTrue(callable(value.match))
         self.assertEqual(operator, ComparisonOperator.REGEX_MATCH)
 
     def test_validate_and_normalize_comparison_condition_data_numeric(self):
         value, operator = _validate_and_normalize_comparison_condition_data(
-            100, ComparisonOperator.GREATER_THAN
+            100,
+            ComparisonOperator.GREATER_THAN,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertEqual(value, 100)
         self.assertEqual(operator, ComparisonOperator.GREATER_THAN)
@@ -396,19 +421,25 @@ class TestValidateAndNormalizeComparisonConditionData(unittest.TestCase):
     def test_validate_and_normalize_comparison_condition_data_numeric_invalid(self):
         with self.assertRaises(ValueError):
             _validate_and_normalize_comparison_condition_data(
-                "100", ComparisonOperator.GREATER_THAN
+                "100",
+                ComparisonOperator.GREATER_THAN,
+                merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
             )
 
     def test_validate_and_normalize_comparison_condition_data_string(self):
         value, operator = _validate_and_normalize_comparison_condition_data(
-            "python", ComparisonOperator.EQUAL
+            "python",
+            ComparisonOperator.EQUAL,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertEqual(value, "python")
         self.assertEqual(operator, ComparisonOperator.EQUAL)
 
     def test_validate_and_normalize_comparison_condition_data_list(self):
         value, operator = _validate_and_normalize_comparison_condition_data(
-            ["python", "java"], ComparisonOperator.IN
+            ["python", "java"],
+            ComparisonOperator.IN,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertEqual(value, set(["python", "java"]))
         self.assertEqual(operator, ComparisonOperator.IN)
@@ -416,19 +447,23 @@ class TestValidateAndNormalizeComparisonConditionData(unittest.TestCase):
     def test_validate_and_normalize_comparison_condition_data_list_invalid(self):
         with self.assertRaises(ValueError):
             _validate_and_normalize_comparison_condition_data(
-                "python", ComparisonOperator.IN
+                "python",
+                ComparisonOperator.IN,
+                merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
             )
 
     def test_validate_and_normalize_comparison_condition_data_boolean_equal(self):
         value, operator = _validate_and_normalize_comparison_condition_data(
-            True, ComparisonOperator.EQUAL
+            True, ComparisonOperator.EQUAL, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
         )
         self.assertEqual(value, True)
         self.assertEqual(operator, ComparisonOperator.IS)
 
     def test_validate_and_normalize_comparison_condition_data_boolean_not_equal(self):
         value, operator = _validate_and_normalize_comparison_condition_data(
-            True, ComparisonOperator.NOT_EQUAL
+            True,
+            ComparisonOperator.NOT_EQUAL,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         self.assertEqual(value, True)
         self.assertEqual(operator, ComparisonOperator.IS_NOT)

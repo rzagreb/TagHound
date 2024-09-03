@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from taghound.constants import DEFAULT_WEIGHT, ComparisonKey, RuleKey
+from taghound.constants import (
+    DEFAULT_REGEX_MERGE_PATTERN,
+    DEFAULT_WEIGHT,
+    ComparisonKey,
+    RuleKey,
+)
 from taghound.models import TagRule
 from taghound.exceptions import MissingRootConditionError, RuleAndOrTogetherError
 from taghound.scalar.function_builder import create_scalar_function
@@ -13,6 +18,7 @@ def to_tag_rule(
     rule_data: Mapping[str, Any],
     add_scalar_func: bool = True,
     add_vector_fn: bool = True,
+    merge_pattern: str = DEFAULT_REGEX_MERGE_PATTERN,
 ) -> TagRule:
     """Create a TagRule object from the given data.
 
@@ -68,8 +74,16 @@ def to_tag_rule(
         weight=weight,
         info=info,
         required_fields=required_fields,
-        scalar_check=create_scalar_function(rule_data) if add_scalar_func else None,
-        vector_check=create_vector_function(rule_data) if add_vector_fn else None,
+        scalar_check=(
+            create_scalar_function(rule_data, merge_pattern=merge_pattern)
+            if add_scalar_func
+            else None
+        ),
+        vector_check=(
+            create_vector_function(rule_data, merge_pattern=merge_pattern)
+            if add_vector_fn
+            else None
+        ),
         data=rule_data,
     )
     return tag
