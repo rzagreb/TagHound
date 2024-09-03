@@ -14,11 +14,12 @@ from taghound.constants import (
 )
 
 
-def create_vector_function(rule: Mapping[str, Any]) -> PdEvalFn:
+def create_vector_function(rule: Mapping[str, Any], merge_pattern: str) -> PdEvalFn:
     """Create a function that will evaluate the vector condition.
 
     Args:
         rule (Mapping[str, Any]): The rule to evaluate.
+        merge_pattern (str): The pattern to merge the regex patterns.
 
     Returns:
         PdEvalFn: The function that will evaluate the vector condition.
@@ -29,12 +30,12 @@ def create_vector_function(rule: Mapping[str, Any]) -> PdEvalFn:
     if RuleKey.ROOT_OR.value in rule:
 
         def vector_mask(df: pd.DataFrame) -> pd.Series:
-            return _evaluate_criteria(df, rule)
+            return _evaluate_criteria(df, rule, merge_pattern=merge_pattern)
 
     elif RuleKey.ROOT_AND.value in rule:
 
         def vector_mask(df: pd.DataFrame) -> pd.Series:
-            return _evaluate_criteria(df, rule)
+            return _evaluate_criteria(df, rule, merge_pattern=merge_pattern)
 
     else:
         raise ValueError(
@@ -46,22 +47,32 @@ def create_vector_function(rule: Mapping[str, Any]) -> PdEvalFn:
 
 
 def _evaluate_criteria(
-    df: pd.DataFrame, rule: Mapping[str, Union[list, dict]]
+    df: pd.DataFrame, rule: Mapping[str, Union[list, dict]], merge_pattern: str
 ) -> pd.Series:
+    """ Evaluate the criteria based on the rule.
+    
+    Args:
+        df (pd.DataFrame): The DataFrame to evaluate.
+        rule (Mapping[str, Union[list, dict]]): The rule to evaluate.
+        merge_pattern (str): The pattern to merge the regex patterns.
+
+    Returns:
+        pd.Series: The Series condition.
+    """
     if df.empty:
         return pd.Series([False] * len(df), index=df.index)
 
     if LogicalOperator.AND.value in rule:
         mask = pd.Series([True] * len(df), index=df.index)
         for cond in rule[LogicalOperator.AND.value]:
-            mask &= _evaluate_criteria(df, cond)
+            mask &= _evaluate_criteria(df, cond, merge_pattern=merge_pattern)
         return mask
 
     elif LogicalOperator.OR.value in rule:
         mask = pd.Series([False] * len(df), index=df.index)
         for cond in rule[LogicalOperator.OR.value]:
             try:
-                mask |= _evaluate_criteria(df, cond)
+                mask |= _evaluate_criteria(df, cond, merge_pattern=merge_pattern)
             except Exception as e:
                 print(f"Error evaluating condition: {cond}")
                 print(df)
@@ -102,13 +113,33 @@ def _evaluate_criteria(
             )
 
         return _make_series_condition(
-            df=df, column=column, operator=operator, const_value=const_value
+            df=df,
+            column=column,
+            operator=operator,
+            const_value=const_value,
+            merge_pattern=merge_pattern,
         )
 
 
 def _make_series_condition(
-    df: pd.DataFrame, column: str, operator: str, const_value: Union[str, list, bool]
+    df: pd.DataFrame,
+    column: str,
+    operator: str,
+    const_value: Union[str, list, bool],
+    merge_pattern: str,
 ) -> pd.Series[bool]:
+    """Create a Series condition based on the operator and value.
+
+    Args:
+        df (pd.DataFrame): The DataFrame to evaluate.
+        column (str): The column to evaluate.
+        operator (str): The operator to use.
+        const_value (Union[str, list, bool]): The value to compare against.
+        merge_pattern (str): The merge pattern to use.
+
+    Returns:
+        pd.Series[bool]: The Series condition.
+    """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame.")
 
@@ -119,8 +150,7 @@ def _make_series_condition(
         const_value = (
             "|".join(const_value) if isinstance(const_value, list) else const_value
         )
-        # This is better than \b...\b because it also matches cases like `C++`
-        const_value = r"(?<!\w)(?:{})(?!\w)".format(const_value)
+        const_value = merge_pattern.format(pattern=const_value)
 
         if operator == ComparisonOperator.REGEX_MATCH.value:
             return df[column].str.contains(const_value, regex=True, flags=re.IGNORECASE)

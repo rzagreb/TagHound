@@ -18,14 +18,25 @@ from taghound.exceptions import InvalidOperatorError, MissingRootConditionError
 from taghound.scalar.operators import ComparisonOperatorMap, LogicalOperatorMap
 
 
-def create_scalar_function(data: Mapping[str, Any]) -> PyEvalFn:
+def create_scalar_function(data: Mapping[str, Any], merge_pattern: str) -> PyEvalFn:
+    """Create a function that will evaluate the scalar condition.
+
+    Args:
+        data (Mapping): The data to create the scalar function.
+        merge_pattern (str): The pattern to merge the regex patterns.
+
+    Returns:
+        PyEvalFn: The function that will evaluate the scalar condition.
+    """
     if RuleKey.ROOT_AND.value in data:
         condition_fn = _create_logic_function(
-            {LogicalOperator.AND.value: data[RuleKey.ROOT_AND.value]}
+            {LogicalOperator.AND.value: data[RuleKey.ROOT_AND.value]},
+            merge_pattern=merge_pattern,
         )
     elif RuleKey.ROOT_OR.value in data:
         condition_fn = _create_logic_function(
-            {LogicalOperator.OR.value: data[RuleKey.ROOT_OR.value]}
+            {LogicalOperator.OR.value: data[RuleKey.ROOT_OR.value]},
+            merge_pattern=merge_pattern,
         )
     else:
         raise MissingRootConditionError(
@@ -35,12 +46,13 @@ def create_scalar_function(data: Mapping[str, Any]) -> PyEvalFn:
 
 
 def _create_logic_function(
-    params: Mapping[str, Sequence[Mapping[str, Any]]],
+    params: Mapping[str, Sequence[Mapping[str, Any]]], merge_pattern: str
 ) -> Callable:
     """Create a function that will evaluate the logical operation (OR/AND).
 
     Args:
         params (Mapping): The parameters for the logical operation.
+        merge_pattern (str): The pattern to merge the regex patterns.
 
     Returns:
         Callable: The function that will evaluate the logical operation.
@@ -74,19 +86,23 @@ def _create_logic_function(
 
     def logic_function(data: Mapping[str, Any]) -> bool:
         return logical_fn(
-            fn(data) for fn in _parse_conditions(params[logical_operator.value])
+            fn(data)
+            for fn in _parse_conditions(
+                params[logical_operator.value], merge_pattern=merge_pattern
+            )
         )
 
     return logic_function
 
 
 def _parse_conditions(
-    conditions: Sequence[Mapping],
+    conditions: Sequence[Mapping], merge_pattern: str
 ) -> list[Callable[[Mapping[str, Any]], bool]]:
     """Create a list of functions that will evaluate the conditions.
 
     Args:
-        elems (list[Mapping]): The list of conditions to be evaluated.
+        conditions (list[Mapping]): The list of conditions to be evaluated.
+        merge_pattern (str): The pattern to merge the regex patterns.
 
     Returns:
         list[Callable]: The list of functions that will evaluate the conditions.
@@ -112,7 +128,9 @@ def _parse_conditions(
             raise ValueError("Empty Mapping found in logical conditions.")
 
         if len(condition.keys()) == 1:
-            conditions_fn = _create_logic_function(condition)
+            conditions_fn = _create_logic_function(
+                condition, merge_pattern=merge_pattern
+            )
             comparison_fns.append(conditions_fn)
         else:
             fn = _make_comparison_condition_function(
@@ -121,20 +139,22 @@ def _parse_conditions(
                 operator=condition.get(
                     ComparisonKey.OPERATOR.value, DEFAULT_COMPARISON_OPERATOR.value
                 ),
+                merge_pattern=merge_pattern,
             )
             comparison_fns.append(fn)
     return comparison_fns
 
 
 def _make_comparison_condition_function(
-    key: str, value: Any, operator: str
+    key: str, value: Any, operator: str, merge_pattern: str
 ) -> Callable[[Any], bool]:
     """Create a function that will evaluate the comparison condition.
 
     Args:
-        operator (str): The operator used in the condition e.g `=`, `>`, ...
         key (str): The key in the Mapping to be compared.
         value (Any): The value to be compared.
+        operator (str): The operator used in the condition e.g `=`, `>`, ...
+        merge_pattern (str): The pattern to merge the regex patterns.
 
     Returns:
         Callable: The function that will evaluate the comparison condition.
@@ -142,7 +162,7 @@ def _make_comparison_condition_function(
     operator_enum = ComparisonOperator(operator)
 
     value, operator_enum = _validate_and_normalize_comparison_condition_data(
-        value, operator_enum
+        value, operator_enum, merge_pattern
     )
 
     def comparison_condition_function(data: Mapping[str, Any]) -> bool:
@@ -152,13 +172,16 @@ def _make_comparison_condition_function(
 
 
 def _validate_and_normalize_comparison_condition_data(
-    value: Any, operator_enum: ComparisonOperator
+    value: Any,
+    operator_enum: ComparisonOperator,
+    merge_pattern: str,
 ) -> tuple[Any, ComparisonOperator]:
     """Validate and normalize the value based on the operator.
 
     Args:
         value (Any): The value to be validated
         operator_enum (ComparisonOperator): The operator used in the condition
+        merge_pattern (str): The pattern to merge the regex patterns
 
     Returns:
         tuple[Any, ComparisonOperator]: The normalized value and operator
@@ -170,11 +193,9 @@ def _validate_and_normalize_comparison_condition_data(
             pattern_str = value
         else:
             raise ValueError(f"Invalid value for regex match: `{value}` ({type(value)}")
-        # This is better than \b...\b because it also matches cases like `C++`
+
         try:
-            value = re.compile(
-                r"(?<!\w)" + f"(?:{pattern_str})" + r"(?!\w)", re.IGNORECASE
-            )
+            value = re.compile(merge_pattern.format(pattern=pattern_str), re.IGNORECASE)
         except re.error:
             raise ValueError(f"Invalid regex pattern: `{pattern_str}`")
 
