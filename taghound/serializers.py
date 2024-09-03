@@ -37,7 +37,7 @@ def to_tag_rule(
     """
     tag_name = rule_data[RuleKey.ID.value]
     weight = rule_data.get(RuleKey.WEIGHT.value, DEFAULT_WEIGHT)
-    label = rule_data.get(RuleKey.LABEL.value, RuleKey.ID.value)
+    label = rule_data.get(RuleKey.LABEL.value, tag_name)
     info = rule_data.get(RuleKey.INFO.value, None)
 
     # Validate
