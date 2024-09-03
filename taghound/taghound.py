@@ -4,6 +4,7 @@ from typing import Any, Mapping, Optional, Union
 
 import pandas as pd
 
+from taghound.constants import DEFAULT_REGEX_MERGE_PATTERN
 from taghound.models import TagRule
 from taghound.serializers import to_tag_rule
 
@@ -92,6 +93,7 @@ class TagHound:
         Args:
             data (Union[pd.DataFrame, list[Mapping[str, Any]]]): The data to search for tags
             output_format (str): The format of the output. Supported values are 'list' and 'columns'
+            output_column_name (str): The name of the column to store the tags
 
         Returns:
             pd.DataFrame: The data with an additional column 'tags' containing the assigned tags
@@ -132,13 +134,16 @@ class TagHound:
 
     @property
     def rule_id_to_weight_map(self) -> dict[str, float]:
+        """Get the mapping of rule id to weight"""
         return self.__rule_id_to_weight_map
 
     @property
     def rule_id_to_label_map(self) -> dict[str, str]:
+        """Get the mapping of rule id to label"""
         return self.__rule_id_to_label_map
 
     def set_rules(self, rules: list[TagRule]) -> None:
+        """Set the rules for the TagHound object"""
         self.__rules = rules
         self.__required_fields = set().union(
             *(rule.required_fields for rule in self.__rules)
@@ -148,6 +153,7 @@ class TagHound:
         self.__rule_id_to_label_map = {rule.id: rule.label for rule in self.__rules}
 
     def add_rule(self, rule: TagRule) -> None:
+        """Add a rule to the TagHound object"""
         self.__rules.append(rule)
         self.__required_fields.update(rule.required_fields)
 
@@ -161,12 +167,16 @@ class TagHound:
         version: str = "1",
         add_scalar_func: bool = True,
         add_vector_fn: bool = True,
+        merge_pattern: str = DEFAULT_REGEX_MERGE_PATTERN,
     ) -> "TagHound":
         """Load rules from a YAML file
 
         Args:
             filepath (str): The file path to load the rules
             version (str): The version of the file format
+            add_scalar_func (bool): Whether to add scalar functions to the rules
+            add_vector_fn (bool): Whether to add vector functions to the rules
+            merge_pattern (str): The merge pattern to use for regex
 
         Returns:
             TagHound: A TagHound object with the rules loaded from the file
@@ -181,6 +191,7 @@ class TagHound:
                     rule_data=rule,
                     add_scalar_func=add_scalar_func,
                     add_vector_fn=add_vector_fn,
+                    merge_pattern=merge_pattern,
                 )
                 for rule in data
             ]
@@ -195,12 +206,16 @@ class TagHound:
         version: str = "1",
         add_scalar_func: bool = True,
         add_vector_fn: bool = True,
+        merge_pattern: str = DEFAULT_REGEX_MERGE_PATTERN,
     ) -> "TagHound":
         """Load rules from a JSON file
 
         Args:
             filepath (str): The file path to load the rules
             version (str): The version of the file format
+            add_scalar_func (bool): Whether to add scalar functions to the rules
+            add_vector_fn (bool): Whether to add vector functions to the rules
+            merge_pattern (str): The merge pattern to use for regex
 
         Returns:
             TagHound: A TagHound object with the rules loaded from the file
@@ -215,6 +230,7 @@ class TagHound:
                     rule_data=rule,
                     add_scalar_func=add_scalar_func,
                     add_vector_fn=add_vector_fn,
+                    merge_pattern=merge_pattern,
                 )
                 for rule in data
             ]

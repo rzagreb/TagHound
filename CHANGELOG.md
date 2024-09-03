@@ -17,3 +17,13 @@
 - Merge pull request #1 from rzagreb/InitFixes
 - Add repository and documentation links to pyproject.toml
 
+## v0.1.18 (2024-09-02)
+
+- fix: Update tag rule serializer to use tag name as default instead of constant "id"
+- Merge branch 'main' of https://github.com/rzagreb/TagHound Merge branch
+- Update to 0.1.17 (#6)
+
+## v0.1.19 (2024-09-03)
+
+- Added option to use custom merge pattern
+

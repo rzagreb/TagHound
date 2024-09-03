@@ -4,6 +4,7 @@ import context  # type: ignore # noqa: F401
 import pandas as pd
 
 from taghound.constants import (
+    DEFAULT_REGEX_MERGE_PATTERN,
     ComparisonKey,
     ComparisonOperator,
     LogicalOperator,
@@ -64,7 +65,7 @@ class TestVectorFunction(unittest.TestCase):
                 }
             ]
         }
-        func = create_vector_function(rule)
+        func = create_vector_function(rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
         result = func(self.df)
         expected = pd.Series([True, False, True, True])
         pd.testing.assert_series_equal(result, expected)
@@ -88,7 +89,7 @@ class TestVectorFunction(unittest.TestCase):
                 }
             ]
         }
-        func = create_vector_function(rule)
+        func = create_vector_function(rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
         result = func(self.df)
         expected = pd.Series([True, False, True, True])
         pd.testing.assert_series_equal(result, expected)
@@ -99,6 +100,7 @@ class TestVectorFunction(unittest.TestCase):
             "description",
             ComparisonOperator.REGEX_MATCH.value,
             "(?:government contract|public sector)",
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         expected = pd.Series([True, False, True, True], name="description")
         pd.testing.assert_series_equal(result, expected)
@@ -109,6 +111,7 @@ class TestVectorFunction(unittest.TestCase):
             "description",
             ComparisonOperator.REGEX_NOT_MATCH.value,
             "(?:government contract|public sector)",
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         expected = pd.Series([False, True, False, False], name="description")
         pd.testing.assert_series_equal(result, expected)
@@ -119,6 +122,7 @@ class TestVectorFunction(unittest.TestCase):
             "clearance_required",
             ComparisonOperator.EQUAL.value,
             False,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         expected = pd.Series([True, False, False, True], name="clearance_required")
         pd.testing.assert_series_equal(result, expected)
@@ -129,13 +133,18 @@ class TestVectorFunction(unittest.TestCase):
             "clearance_required",
             ComparisonOperator.NOT_EQUAL.value,
             False,
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         expected = pd.Series([False, True, True, False], name="clearance_required")
         pd.testing.assert_series_equal(result, expected)
 
     def test_apply_condition_in(self):
         result = _make_series_condition(
-            self.df, "location", ComparisonOperator.IN.value, ["Washington", "New York"]
+            self.df,
+            "location",
+            ComparisonOperator.IN.value,
+            ["Washington", "New York"],
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         expected = pd.Series([True, False, True, True], name="location")
         pd.testing.assert_series_equal(result, expected)
@@ -146,6 +155,7 @@ class TestVectorFunction(unittest.TestCase):
             "location",
             ComparisonOperator.NOT_IN.value,
             ["Washington", "New York"],
+            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
         )
         expected = pd.Series([False, True, False, False], name="location")
         pd.testing.assert_series_equal(result, expected)
@@ -165,7 +175,9 @@ class TestVectorFunction(unittest.TestCase):
                 },
             ]
         }
-        result = _evaluate_criteria(self.df, rule)
+        result = _evaluate_criteria(
+            self.df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
+        )
         expected = pd.Series([True, True, True, True])
         pd.testing.assert_series_equal(result, expected)
 
@@ -184,7 +196,9 @@ class TestVectorFunction(unittest.TestCase):
                 },
             ]
         }
-        result = _evaluate_criteria(self.df, rule)
+        result = _evaluate_criteria(
+            self.df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
+        )
         expected = pd.Series([True, False, False, True])
         pd.testing.assert_series_equal(result, expected)
 
@@ -194,12 +208,12 @@ class TestVectorFunction(unittest.TestCase):
             ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
         }
         with self.assertRaises(ValueError):
-            _evaluate_criteria(self.df, rule) # type: ignore
+            _evaluate_criteria(self.df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)  # type: ignore
 
     def test_create_vector_function_invalid_rule(self):
         rule = {"invalid_key": []}
         with self.assertRaises(ValueError):
-            create_vector_function(rule)
+            create_vector_function(rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
 
 
 if __name__ == "__main__":

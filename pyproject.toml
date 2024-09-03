@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "taghound"
-version = "0.1.17"
+version = "0.1.19"
 description = "TagHound: A Python library for managing and evaluating tag rules using scalar and vector operations. Supports YAML and JSON rule loading."
 authors = ["Roman Zagrebnev"]
 license = "MIT"
