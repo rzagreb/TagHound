@@ -23,3 +23,7 @@
 - Merge branch 'main' of https://github.com/rzagreb/TagHound Merge branch
 - Update to 0.1.17 (#6)
 
+## v0.1.19 (2024-09-03)
+
+- Added option to use custom merge pattern
+
