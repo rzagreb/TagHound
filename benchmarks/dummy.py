@@ -1,19 +1,17 @@
-"""
-To run memory profiler:
-    1. add @profile decorator to the function you want to profile
-    2. Run `mprof run perf_test_v1.py`
+"""Random rule and data generators for the profiling scripts."""
 
-
-NOTE: run_line_profiler will not work with memory_profiler
-NOTE: run_line_profiler will not work with multithreading
-"""
+# ruff: noqa: T201, ANN201, ANN202, ANN401, D103 -- dev profiling helper; prints are its output
 
 import random
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
-import context  # type: ignore # noqa: F401
-
-from taghound.constants import ComparisonKey, ComparisonOperator, LogicalOperator, RuleKey
+from taghound.constants import (
+    ComparisonKey,
+    ComparisonOperator,
+    LogicalOperator,
+    RuleKey,
+)
 from taghound.models import TagRule
 from taghound.serializers import to_tag_rule
 

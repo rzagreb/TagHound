@@ -1,7 +1,11 @@
-import unittest
+"""Tests for the vector (DataFrame) function builder."""
 
-import context  # type: ignore # noqa: F401
+# ruff: noqa: D103, ANN201 -- per-test docstrings are noise; test names carry the intent.
+
+from __future__ import annotations
+
 import pandas as pd
+import pytest
 
 from taghound.constants import (
     DEFAULT_REGEX_MERGE_PATTERN,
@@ -17,9 +21,11 @@ from taghound.vector.function_builder import (
 )
 
 
-class TestVectorFunction(unittest.TestCase):
-    def setUp(self):
-        self.data = [
+@pytest.fixture
+def df() -> pd.DataFrame:
+    """Sample records covering regex, membership, and boolean conditions."""
+    return pd.DataFrame(
+        [
             {
                 "description": "working on government contract",
                 "title": "data scientist",
@@ -49,172 +55,203 @@ class TestVectorFunction(unittest.TestCase):
                 "clearance_level": "",
             },
         ]
-        self.df = pd.DataFrame(self.data)
-
-    def test_create_vector_function_or(self):
-        rule = {
-            RuleKey.ROOT_OR.value: [
-                {
-                    LogicalOperator.AND.value: [
-                        {
-                            ComparisonKey.KEY.value: "description",
-                            ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
-                            ComparisonKey.VALUE.value: "(?:government contract|public sector)",
-                        }
-                    ]
-                }
-            ]
-        }
-        func = create_vector_function(rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
-        result = func(self.df)
-        expected = pd.Series([True, False, True, True])
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_create_vector_function_and(self):
-        rule = {
-            RuleKey.ROOT_AND.value: [
-                {
-                    LogicalOperator.AND.value: [
-                        {
-                            ComparisonKey.KEY.value: "description",
-                            ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
-                            ComparisonKey.VALUE.value: "(?:government contract|public sector)",
-                        },
-                        {
-                            ComparisonKey.KEY.value: "location",
-                            ComparisonKey.OPERATOR.value: ComparisonOperator.IN.value,
-                            ComparisonKey.VALUE.value: ["Washington", "New York"],
-                        },
-                    ]
-                }
-            ]
-        }
-        func = create_vector_function(rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
-        result = func(self.df)
-        expected = pd.Series([True, False, True, True])
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_apply_condition_regex_match(self):
-        result = _make_series_condition(
-            self.df,
-            "description",
-            ComparisonOperator.REGEX_MATCH.value,
-            "(?:government contract|public sector)",
-            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
-        )
-        expected = pd.Series([True, False, True, True], name="description")
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_apply_condition_regex_not_match(self):
-        result = _make_series_condition(
-            self.df,
-            "description",
-            ComparisonOperator.REGEX_NOT_MATCH.value,
-            "(?:government contract|public sector)",
-            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
-        )
-        expected = pd.Series([False, True, False, False], name="description")
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_apply_condition_equal(self):
-        result = _make_series_condition(
-            self.df,
-            "clearance_required",
-            ComparisonOperator.EQUAL.value,
-            False,
-            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
-        )
-        expected = pd.Series([True, False, False, True], name="clearance_required")
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_apply_condition_not_equal(self):
-        result = _make_series_condition(
-            self.df,
-            "clearance_required",
-            ComparisonOperator.NOT_EQUAL.value,
-            False,
-            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
-        )
-        expected = pd.Series([False, True, True, False], name="clearance_required")
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_apply_condition_in(self):
-        result = _make_series_condition(
-            self.df,
-            "location",
-            ComparisonOperator.IN.value,
-            ["Washington", "New York"],
-            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
-        )
-        expected = pd.Series([True, False, True, True], name="location")
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_apply_condition_not_in(self):
-        result = _make_series_condition(
-            self.df,
-            "location",
-            ComparisonOperator.NOT_IN.value,
-            ["Washington", "New York"],
-            merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
-        )
-        expected = pd.Series([False, True, False, False], name="location")
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_evaluate_criteria_or(self):
-        rule = {
-            LogicalOperator.OR.value: [
-                {
-                    ComparisonKey.KEY.value: "description",
-                    ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
-                    ComparisonKey.VALUE.value: "(?:government contract|public sector)",
-                },
-                {
-                    ComparisonKey.KEY.value: "location",
-                    ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
-                    ComparisonKey.VALUE.value: "San Francisco",
-                },
-            ]
-        }
-        result = _evaluate_criteria(
-            self.df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
-        )
-        expected = pd.Series([True, True, True, True])
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_evaluate_criteria_and(self):
-        rule = {
-            LogicalOperator.AND.value: [
-                {
-                    ComparisonKey.KEY.value: "description",
-                    ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
-                    ComparisonKey.VALUE.value: "(?:government contract|public sector)",
-                },
-                {
-                    ComparisonKey.KEY.value: "location",
-                    ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
-                    ComparisonKey.VALUE.value: "Washington",
-                },
-            ]
-        }
-        result = _evaluate_criteria(
-            self.df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
-        )
-        expected = pd.Series([True, False, False, True])
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_evaluate_criteria_invalid(self):
-        rule = {
-            ComparisonKey.KEY.value: "description",
-            ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
-        }
-        with self.assertRaises(ValueError):
-            _evaluate_criteria(self.df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)  # type: ignore
-
-    def test_create_vector_function_invalid_rule(self):
-        rule = {"invalid_key": []}
-        with self.assertRaises(ValueError):
-            create_vector_function(rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
+    )
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_create_vector_function_or(df: pd.DataFrame):
+    rule = {
+        RuleKey.ROOT_OR.value: [
+            {
+                LogicalOperator.AND.value: [
+                    {
+                        ComparisonKey.KEY.value: "description",
+                        ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
+                        ComparisonKey.VALUE.value: "(?:government contract|public sector)",
+                    }
+                ]
+            }
+        ]
+    }
+    func = create_vector_function(rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
+    result = func(df)
+    expected = pd.Series([True, False, True, True])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_create_vector_function_and(df: pd.DataFrame):
+    rule = {
+        RuleKey.ROOT_AND.value: [
+            {
+                LogicalOperator.AND.value: [
+                    {
+                        ComparisonKey.KEY.value: "description",
+                        ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
+                        ComparisonKey.VALUE.value: "(?:government contract|public sector)",
+                    },
+                    {
+                        ComparisonKey.KEY.value: "location",
+                        ComparisonKey.OPERATOR.value: ComparisonOperator.IN.value,
+                        ComparisonKey.VALUE.value: ["Washington", "New York"],
+                    },
+                ]
+            }
+        ]
+    }
+    func = create_vector_function(rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
+    result = func(df)
+    expected = pd.Series([True, False, True, True])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_apply_condition_regex_match(df: pd.DataFrame):
+    result = _make_series_condition(
+        df,
+        "description",
+        ComparisonOperator.REGEX_MATCH.value,
+        "(?:government contract|public sector)",
+        merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
+    )
+    expected = pd.Series([True, False, True, True], name="description")
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_apply_condition_regex_not_match(df: pd.DataFrame):
+    result = _make_series_condition(
+        df,
+        "description",
+        ComparisonOperator.REGEX_NOT_MATCH.value,
+        "(?:government contract|public sector)",
+        merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
+    )
+    expected = pd.Series([False, True, False, False], name="description")
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_apply_condition_equal(df: pd.DataFrame):
+    result = _make_series_condition(
+        df,
+        "clearance_required",
+        ComparisonOperator.EQUAL.value,
+        False,
+        merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
+    )
+    expected = pd.Series([True, False, False, True], name="clearance_required")
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_apply_condition_not_equal(df: pd.DataFrame):
+    result = _make_series_condition(
+        df,
+        "clearance_required",
+        ComparisonOperator.NOT_EQUAL.value,
+        False,
+        merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
+    )
+    expected = pd.Series([False, True, True, False], name="clearance_required")
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_apply_condition_in(df: pd.DataFrame):
+    result = _make_series_condition(
+        df,
+        "location",
+        ComparisonOperator.IN.value,
+        ["Washington", "New York"],
+        merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
+    )
+    expected = pd.Series([True, False, True, True], name="location")
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_apply_condition_not_in(df: pd.DataFrame):
+    result = _make_series_condition(
+        df,
+        "location",
+        ComparisonOperator.NOT_IN.value,
+        ["Washington", "New York"],
+        merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
+    )
+    expected = pd.Series([False, True, False, False], name="location")
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_apply_condition_greater_than():
+    frame = pd.DataFrame([{"height": 10}, {"height": 30}])
+    result = _make_series_condition(
+        frame,
+        "height",
+        ComparisonOperator.GREATER_THAN.value,
+        20,
+        merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
+    )
+    expected = pd.Series([False, True], name="height")
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_evaluate_criteria_missing_op_defaults_to_equal(df: pd.DataFrame):
+    rule = {
+        LogicalOperator.AND.value: [
+            {
+                ComparisonKey.KEY.value: "location",
+                ComparisonKey.VALUE.value: "Washington",
+            }
+        ]
+    }
+    result = _evaluate_criteria(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
+    expected = pd.Series([True, False, False, True])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_evaluate_criteria_or(df: pd.DataFrame):
+    rule = {
+        LogicalOperator.OR.value: [
+            {
+                ComparisonKey.KEY.value: "description",
+                ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
+                ComparisonKey.VALUE.value: "(?:government contract|public sector)",
+            },
+            {
+                ComparisonKey.KEY.value: "location",
+                ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
+                ComparisonKey.VALUE.value: "San Francisco",
+            },
+        ]
+    }
+    result = _evaluate_criteria(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
+    expected = pd.Series([True, True, True, True])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_evaluate_criteria_and(df: pd.DataFrame):
+    rule = {
+        LogicalOperator.AND.value: [
+            {
+                ComparisonKey.KEY.value: "description",
+                ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
+                ComparisonKey.VALUE.value: "(?:government contract|public sector)",
+            },
+            {
+                ComparisonKey.KEY.value: "location",
+                ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
+                ComparisonKey.VALUE.value: "Washington",
+            },
+        ]
+    }
+    result = _evaluate_criteria(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
+    expected = pd.Series([True, False, False, True])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_evaluate_criteria_invalid(df: pd.DataFrame):
+    rule = {
+        ComparisonKey.KEY.value: "description",
+        ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
+    }
+    with pytest.raises(ValueError):
+        _evaluate_criteria(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)  # type: ignore
+
+
+def test_create_vector_function_invalid_rule():
+    rule = {"invalid_key": []}
+    with pytest.raises(ValueError):
+        create_vector_function(rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)

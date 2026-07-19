@@ -66,10 +66,17 @@ ENV/
 .DS_Store
 
 # Temporary files
-/profiling
 /support_scripts
-/PRIVATE_NOTES.md
+
+# Benchmark & profiling artifacts
+.benchmarks/
+.profiles/
 
 # ruff cache
 .ruff_cache/
 
+# pytest cache
+.pytest_cache/
+
+# Internal
+TODO.md

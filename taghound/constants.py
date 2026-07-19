@@ -1,7 +1,10 @@
+"""Shared enums, type aliases, and defaults for rule definitions."""
+
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from enum import Enum
-from typing import Any, Callable, Mapping
+from typing import Any
 
 import pandas as pd
 
@@ -10,11 +13,15 @@ PdEvalFn = Callable[[pd.DataFrame], pd.Series]
 
 
 class LogicalOperator(Enum):
+    """Logical operators combining condition lists."""
+
     AND = "and"
     OR = "or"
 
 
 class ComparisonOperator(Enum):
+    """Comparison operators usable in a condition's `op` field."""
+
     EQUAL = "="
     NOT_EQUAL = "!="
     GREATER_THAN = ">"
@@ -50,6 +57,8 @@ ComparisonOperatorListOnly = {
 
 
 class RuleKey(Enum):
+    """Top-level keys of a rule definition."""
+
     ID = "id"
     LABEL = "label"
     WEIGHT = "weight"
@@ -59,6 +68,8 @@ class RuleKey(Enum):
 
 
 class ComparisonKey(Enum):
+    """Keys of a single comparison condition."""
+
     KEY = "key"
     OPERATOR = "op"
     VALUE = "value"

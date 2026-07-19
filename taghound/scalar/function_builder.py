@@ -1,7 +1,10 @@
+"""Build per-rule check functions that evaluate one data mapping at a time."""
+
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
+from collections.abc import Callable, Mapping, Sequence
 
 from taghound.constants import (
     DEFAULT_COMPARISON_OPERATOR,
@@ -71,26 +74,20 @@ def _create_logic_function(
         fn = _make_logic_operation_function(params)
         ```
     """
-
     try:
         logical_operator = LogicalOperator(next(iter(params.keys())))
-    except StopIteration:
+    except (StopIteration, ValueError):
         raise InvalidOperatorError(
             f"Invalid operator. Must be one of {LogicalOperator.__members__}"
         )
-    except ValueError:
-        raise InvalidOperatorError(
-            f"Invalid operator. Must be one of {LogicalOperator.__members__}"
-        )
-    logical_fn = LogicalOperatorMap[LogicalOperator(next(iter(params.keys())))]
+    logical_fn = LogicalOperatorMap[logical_operator]
+
+    condition_fns = _parse_conditions(
+        params[logical_operator.value], merge_pattern=merge_pattern
+    )
 
     def logic_function(data: Mapping[str, Any]) -> bool:
-        return logical_fn(
-            fn(data)
-            for fn in _parse_conditions(
-                params[logical_operator.value], merge_pattern=merge_pattern
-            )
-        )
+        return logical_fn(fn(data) for fn in condition_fns)
 
     return logic_function
 
@@ -146,7 +143,7 @@ def _parse_conditions(
 
 
 def _make_comparison_condition_function(
-    key: str, value: Any, operator: str, merge_pattern: str
+    key: str, value: object, operator: str, merge_pattern: str
 ) -> Callable[[Any], bool]:
     """Create a function that will evaluate the comparison condition.
 
@@ -172,7 +169,7 @@ def _make_comparison_condition_function(
 
 
 def _validate_and_normalize_comparison_condition_data(
-    value: Any,
+    value: object,
     operator_enum: ComparisonOperator,
     merge_pattern: str,
 ) -> tuple[Any, ComparisonOperator]:

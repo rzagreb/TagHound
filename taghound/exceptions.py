@@ -1,10 +1,13 @@
+"""Exceptions raised while parsing rule definitions."""
+
+
 class InvalidOperatorError(Exception):
-    pass
+    """A logical node uses an operator other than `and`/`or`."""
 
 
 class RuleAndOrTogetherError(Exception):
-    pass
+    """A rule's root condition has both `and` and `or`."""
 
 
 class MissingRootConditionError(Exception):
-    pass
+    """A rule's root condition has neither `and` nor `or`."""
