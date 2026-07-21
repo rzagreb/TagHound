@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## [0.3.0] 2026-07-21
+
+### Changed
+
+- Vector regex conditions use an inline `(?i)` flag instead of `flags=re.IGNORECASE`, so `str.contains` can run on the vectorised RE2 engine for `string[pyarrow]` columns instead of always falling back to per-element Python `re`. **Rule regexes must be RE2-compatible (no look-around or backreferences).**
+
+### Fixed
+
+- Vector regex conditions no longer raise on missing values; a null cell is now treated as "no match" instead of erroring on `~` (regex-not-match) or leaking NA into `and`/`or` masks.
+
 ## [0.2.0] - 2026-07-19
 
 ### Added

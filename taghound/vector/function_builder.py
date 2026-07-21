@@ -154,19 +154,24 @@ def _build_series_condition(
         pattern = (
             "|".join(const_value) if isinstance(const_value, list) else const_value
         )
-        pattern = merge_pattern.format(pattern=pattern)
+        # Inline `(?i)` rather than `flags=re.IGNORECASE`: passing `flags` forces
+        # pandas onto the slow per-element Python `re` path even for
+        # `string[pyarrow]` columns. With the flag inline, pyarrow-backed columns
+        # use the vectorised RE2 engine while object columns behave the same. Note
+        # RE2 rejects look-around and backreferences.
+        pattern = "(?i)" + merge_pattern.format(pattern=pattern)
         try:
-            re.compile(pattern, re.IGNORECASE)
+            re.compile(pattern)
         except re.error:
             raise ValueError(f"Invalid regex pattern: `{pattern}`")
         negate = operator_enum == ComparisonOperator.REGEX_NOT_MATCH
 
         def regex_condition(df: pd.DataFrame) -> pd.Series:
-            # A string pattern (not a precompiled one) keeps pyarrow-backed
-            # string columns working; pandas caches the compile.
-            matches = _get_column(df, column).str.contains(
-                pattern, regex=True, flags=re.IGNORECASE
-            )
+            matches = _get_column(df, column).str.contains(pattern, regex=True)
+            # Missing values yield <NA>/NaN; treat them as "no match" and coerce
+            # to a plain bool Series so nullable (pyarrow) results don't leak NA
+            # into the and/or masks or the final `to_numpy(dtype=bool)`.
+            matches = matches.fillna(False).astype(bool)
             return ~matches if negate else matches
 
         return regex_condition
