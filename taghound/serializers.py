@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 from taghound.constants import (
     DEFAULT_REGEX_MERGE_PATTERN,
     DEFAULT_WEIGHT,
+    RE2_SAFE_REGEX_MERGE_PATTERN,
     ComparisonKey,
     LogicalOperator,
     RuleKey,
 )
-from taghound.models import TagRule
 from taghound.exceptions import MissingRootConditionError, RuleAndOrTogetherError
+from taghound.models import TagRule
 from taghound.scalar.function_builder import create_scalar_function
 from taghound.vector.function_builder import create_vector_function
 
@@ -23,15 +24,23 @@ def to_tag_rule(
     add_scalar_func: bool = True,
     add_vector_fn: bool = True,
     merge_pattern: str = DEFAULT_REGEX_MERGE_PATTERN,
+    vector_merge_pattern: str = RE2_SAFE_REGEX_MERGE_PATTERN,
 ) -> TagRule:
     """Create a TagRule object from the given data.
+
+    The two paths take separate merge patterns because only the vectorized one is
+    engine-constrained: it runs on RE2, which rejects look-around. Overriding
+    `merge_pattern` alone leaves the vector path RE2-safe.
 
     Args:
         rule_data (Mapping[str, Any]): The rule definition: `id`, optional `label`,
             `weight` and `info`, plus a root `and` or `or` condition list.
         add_scalar_func (bool): Whether to build the scalar check function.
         add_vector_fn (bool): Whether to build the vector check function.
-        merge_pattern (str): The pattern used to merge regex patterns.
+        merge_pattern (str): The pattern used to merge regex patterns on the
+            scalar path, which runs on Python `re`.
+        vector_merge_pattern (str): The same, for the vectorized path. Must be
+            RE2-safe.
 
     Returns:
         TagRule: The TagRule object created from the data.
@@ -93,7 +102,7 @@ def to_tag_rule(
             else None
         ),
         vector_check=(
-            create_vector_function(rule_data, merge_pattern=merge_pattern)
+            create_vector_function(rule_data, merge_pattern=vector_merge_pattern)
             if add_vector_fn
             else None
         ),

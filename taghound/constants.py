@@ -85,3 +85,12 @@ DEFAULT_WEIGHT = 0.0
 # - Limitations: does not work when we need to match `.python` with `python` pattern
 DEFAULT_REGEX_MERGE_PATTERN = r"(?<!\w)(?:{pattern})(?!\w)"
 """ Pattern used to merge list of patterns into a single regex pattern """
+
+# Same boundaries as DEFAULT_REGEX_MERGE_PATTERN, spelled without look-around so
+# RE2 accepts it -- that's the engine pyarrow-backed columns run on. "Not preceded
+# by a word char" and "at the start or on a \W" are the same condition, so for the
+# boolean `contains` the vector path needs, the two are equivalent. Do NOT fall back
+# to \b...\b here: it silently drops every pattern that starts or ends with
+# punctuation, so `C++`, `C#` and `#LI-Remote` never match.
+RE2_SAFE_REGEX_MERGE_PATTERN = r"(?:^|\W)(?:{pattern})(?:$|\W)"
+""" Merge pattern for the vectorized path, where look-around is unavailable """

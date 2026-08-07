@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
-from collections.abc import Mapping
 
 import pandas as pd
 
-from taghound.constants import DEFAULT_REGEX_MERGE_PATTERN
+from taghound.constants import (
+    DEFAULT_REGEX_MERGE_PATTERN,
+    RE2_SAFE_REGEX_MERGE_PATTERN,
+)
 from taghound.models import TagRule
 from taghound.serializers import to_tag_rule
 
@@ -192,6 +195,7 @@ class TagHound:
         add_scalar_func: bool,
         add_vector_fn: bool,
         merge_pattern: str,
+        vector_merge_pattern: str,
     ) -> TagHound:
         """Create a TagHound from already-parsed rule dicts.
 
@@ -200,7 +204,9 @@ class TagHound:
             version (str): The version of the file format.
             add_scalar_func (bool): Whether to add scalar functions to the rules.
             add_vector_fn (bool): Whether to add vector functions to the rules.
-            merge_pattern (str): The merge pattern to use for regex.
+            merge_pattern (str): The merge pattern for the scalar path.
+            vector_merge_pattern (str): The merge pattern for the vectorized
+                path. Must be RE2-safe.
 
         Returns:
             TagHound: A TagHound object with the given rules.
@@ -213,6 +219,7 @@ class TagHound:
                 add_scalar_func=add_scalar_func,
                 add_vector_fn=add_vector_fn,
                 merge_pattern=merge_pattern,
+                vector_merge_pattern=vector_merge_pattern,
             )
             for rule in data
         ]
@@ -226,6 +233,7 @@ class TagHound:
         add_scalar_func: bool = True,
         add_vector_fn: bool = True,
         merge_pattern: str = DEFAULT_REGEX_MERGE_PATTERN,
+        vector_merge_pattern: str = RE2_SAFE_REGEX_MERGE_PATTERN,
     ) -> TagHound:
         """Load rules from a YAML file.
 
@@ -234,7 +242,9 @@ class TagHound:
             version (str): The version of the file format
             add_scalar_func (bool): Whether to add scalar functions to the rules
             add_vector_fn (bool): Whether to add vector functions to the rules
-            merge_pattern (str): The merge pattern to use for regex
+            merge_pattern (str): The merge pattern for the scalar path
+            vector_merge_pattern (str): The merge pattern for the vectorized
+                path. Must be RE2-safe.
 
         Returns:
             TagHound: A TagHound object with the rules loaded from the file
@@ -248,6 +258,7 @@ class TagHound:
             add_scalar_func=add_scalar_func,
             add_vector_fn=add_vector_fn,
             merge_pattern=merge_pattern,
+            vector_merge_pattern=vector_merge_pattern,
         )
 
     @classmethod
@@ -258,6 +269,7 @@ class TagHound:
         add_scalar_func: bool = True,
         add_vector_fn: bool = True,
         merge_pattern: str = DEFAULT_REGEX_MERGE_PATTERN,
+        vector_merge_pattern: str = RE2_SAFE_REGEX_MERGE_PATTERN,
     ) -> TagHound:
         """Load rules from a JSON file.
 
@@ -266,7 +278,9 @@ class TagHound:
             version (str): The version of the file format
             add_scalar_func (bool): Whether to add scalar functions to the rules
             add_vector_fn (bool): Whether to add vector functions to the rules
-            merge_pattern (str): The merge pattern to use for regex
+            merge_pattern (str): The merge pattern for the scalar path
+            vector_merge_pattern (str): The merge pattern for the vectorized
+                path. Must be RE2-safe.
 
         Returns:
             TagHound: A TagHound object with the rules loaded from the file
@@ -280,4 +294,5 @@ class TagHound:
             add_scalar_func=add_scalar_func,
             add_vector_fn=add_vector_fn,
             merge_pattern=merge_pattern,
+            vector_merge_pattern=vector_merge_pattern,
         )

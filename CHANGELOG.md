@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [0.4.0] 2026-08-06
+
+### Added
+
+- `RE2_SAFE_REGEX_MERGE_PATTERN` — the same word boundaries as the default merge pattern, spelled without look-around so RE2 accepts it.
+- `to_tag_rule`, `TagHound.rules_from_yaml` and `TagHound.rules_from_json` take a separate `vector_merge_pattern`, defaulting to the RE2-safe constant. Only the vectorised path is engine-constrained, so the scalar path keeps the look-around default.
+
+### Fixed
+
+- The vectorised path no longer forces callers to hand-roll an RE2-safe merge pattern. Callers that worked around 0.3.0 by passing `\b(?:{pattern})\b` were silently dropping every pattern that starts or ends with punctuation — `C++`, and `.NET` could never match. Drop the override to pick up the fix.
+
 ## [0.3.0] 2026-07-21
 
 ### Changed
