@@ -35,7 +35,7 @@ def test_scalar(
 
     def run() -> None:
         for row in selected:
-            hound.find_all_tags(row, multi_threaded=False)
+            hound.find_all_tags(row)
 
     benchmark(run)
 

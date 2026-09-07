@@ -81,3 +81,4 @@ ENV/
 # Internal
 TODO.md
 CLAUDE.md
+taghound/vector/function_builder.py

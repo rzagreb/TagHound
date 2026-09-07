@@ -153,28 +153,6 @@ def test_find_all_tags(th: TagHound):
     assert th.find_all_tags(data) == ()  # city is not Portland or Seattle
 
 
-def test_find_all_tags_multithread(th: TagHound):
-    data = {
-        "memo": "annual renewal",
-        "merchant": "blue bottle",
-        "city": "Portland",
-        "recurring": "true",
-        "plan": "Annual",
-    }
-    assert th.find_all_tags(data, multi_threaded=True) == (RULE_ID,)
-
-    data = {
-        "memo": "auto-renew",
-        "merchant": "corner grocer",
-        "city": "Seattle",
-        "recurring": "false",
-        "plan": "Annual",
-    }
-    assert (
-        th.find_all_tags(data, multi_threaded=True) == ()
-    )  # merchant is on the excluded list
-
-
 def test_rules_from_yaml(tmp_path: Path, rules: list[TagRule]):
     path = tmp_path / "rules.yml"
     path.write_text(yaml.safe_dump(sample_rule_data()))

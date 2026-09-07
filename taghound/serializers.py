@@ -39,18 +39,8 @@ def to_tag_rule(
     engine-constrained: it runs on RE2, which rejects look-around. Overriding
     `merge_pattern` alone leaves the vector path RE2-safe.
 
-    Args:
-        rule_data (Mapping[str, Any]): The rule definition: `id`, optional `label`,
-            `weight` and `info`, plus a root `and` or `or` condition list.
-        add_scalar_func (bool): Whether to build the scalar check function.
-        add_vector_fn (bool): Whether to build the vector check function.
-        merge_pattern (str): The pattern used to merge regex patterns on the
-            scalar path, which runs on Python `re`.
-        vector_merge_pattern (str): The same, for the vectorized path. Must be
-            RE2-safe.
-
-    Returns:
-        TagRule: The TagRule object created from the data.
+    `rule_data` holds `id`, plus optional `label`, `weight` and `info`, plus a root
+    `and` or `or` condition list.
 
     Example:
         >>> rule = to_tag_rule(
@@ -101,8 +91,10 @@ def to_tag_rule(
             if RuleKey.ROOT_AND.value in rule_data
             else get_required_keys_from_conditions(rule_data[RuleKey.ROOT_OR.value])
         )
-    except KeyError:
-        raise MissingRootConditionError()
+    except KeyError as error:
+        raise MissingRootConditionError(
+            "Root condition must have either `and` or `or`."
+        ) from error
 
     tag = TagRule(
         id=tag_name,
@@ -128,14 +120,7 @@ def to_tag_rule(
 def get_required_keys_from_conditions(
     conditions: Sequence[Mapping[str, Any]],
 ) -> set[str]:
-    """Collect the data keys referenced by the conditions, recursing into nested and/or.
-
-    Args:
-        conditions (Sequence[Mapping[str, Any]]): The conditions to scan.
-
-    Returns:
-        set[str]: The keys the conditions compare against.
-    """
+    """Collect the data keys referenced by the conditions, recursing into nested and/or."""
     keys_set = set()
     for condition in conditions:
         if not isinstance(condition, Mapping):

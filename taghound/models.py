@@ -11,28 +11,31 @@ from taghound.constants import PdEvalFn, PyEvalFn
 
 @dataclass(frozen=True, eq=True, slots=True)
 class TagRule:
-    """A single tag rule: identity, metadata, and its prebuilt check functions."""
+    """A single tag rule: identity, metadata, and its prebuilt check functions.
+
+    Equality and hashing are on `id` alone; every other field is `compare=False`,
+    so two rules sharing an id are the same rule as far as a set or dict is
+    concerned.
+    """
 
     id: str
-    """ Unique identifier for the rule. """
 
     label: str = field(compare=False)
-    """ The label for the rule. No uniqueness is enforced. """
+    """ Human-readable name. No uniqueness is enforced. """
 
     weight: float = field(compare=False)
-    """ The weight of the rule. """
 
     required_fields: set[str] = field(compare=False)
-    """ The required fields for the rule. """
+    """ Every data key the rule's conditions name. """
 
     info: str | None = field(compare=False, default=None)
-    """ Internal comments for the rule. """
+    """ Free-text note for whoever maintains the rule; never matched against. """
 
     scalar_check: PyEvalFn | None = field(compare=False, default=None)
-    """ Scalar function used to check if the rule is satisfied. """
+    """ Checks one mapping. None when built with `add_scalar_func=False`. """
 
     vector_check: PdEvalFn | None = field(compare=False, default=None)
-    """ Vector function used to check if the rule is satisfied. """
+    """ Checks a whole DataFrame. None when built with `add_vector_fn=False`. """
 
     data: Mapping[str, Any] = field(compare=False, default_factory=dict)
-    """ The original data used to create the TagRule object. """
+    """ The rule dict this was built from, and what `dump_rules` writes back out. """

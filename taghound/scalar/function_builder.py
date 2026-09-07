@@ -27,14 +27,10 @@ from taghound.scalar.operators import ComparisonOperatorMap, LogicalOperatorMap
 
 
 def create_scalar_function(data: Mapping[str, Any], merge_pattern: str) -> PyEvalFn:
-    """Create a function that will evaluate the scalar condition.
+    """Build the function that evaluates a rule against one mapping.
 
-    Args:
-        data (Mapping): The data to create the scalar function.
-        merge_pattern (str): The pattern to merge the regex patterns.
-
-    Returns:
-        PyEvalFn: The function that will evaluate the scalar condition.
+    The rule tree is parsed and every regex compiled once here; the returned
+    function only applies them.
     """
     if RuleKey.ROOT_AND.value in data:
         condition_fn = _create_logic_function(
@@ -56,29 +52,7 @@ def create_scalar_function(data: Mapping[str, Any], merge_pattern: str) -> PyEva
 def _create_logic_function(
     params: Mapping[str, Sequence[Mapping[str, Any]]], merge_pattern: str
 ) -> Callable:
-    """Create a function that will evaluate the logical operation (OR/AND).
-
-    Args:
-        params (Mapping): The parameters for the logical operation.
-        merge_pattern (str): The pattern to merge the regex patterns.
-
-    Returns:
-        Callable: The function that will evaluate the logical operation.
-
-    Raises:
-        InvalidOperatorError: If the operator is not valid.
-
-    Example:
-        ```python
-        params = {
-            "and": [
-                {"key": "language", "op": "=", "value": "python"},
-                {"key": "year", "op": ">", "value": 1990},
-            ]
-        }
-        fn = _make_logic_operation_function(params)
-        ```
-    """
+    """Build the function combining a node's child conditions with `and` or `or`."""
     try:
         logical_operator = LogicalOperator(next(iter(params.keys())))
     except (StopIteration, ValueError):
@@ -100,25 +74,7 @@ def _create_logic_function(
 def _parse_conditions(
     conditions: Sequence[Mapping], merge_pattern: str
 ) -> list[Callable[[Mapping[str, Any]], bool]]:
-    """Create a list of functions that will evaluate the conditions.
-
-    Args:
-        conditions (list[Mapping]): The list of conditions to be evaluated.
-        merge_pattern (str): The pattern to merge the regex patterns.
-
-    Returns:
-        list[Callable]: The list of functions that will evaluate the conditions.
-
-    Example:
-        ```python
-        elems = [
-            {"key": "language", "op": "=", "value": "python"},
-            {"key": "year", "op": ">", "value": 1990},
-        ]
-        fns = _make_condition_functions(elems)
-        ```
-
-    """
+    """Build one evaluation function per condition, recursing into nested and/or."""
     if not isinstance(conditions, Sequence):
         raise InvalidRuleTypeError(f"Must be list. Given: `{type(conditions)}`")
 
@@ -152,17 +108,7 @@ def _parse_conditions(
 def _make_comparison_condition_function(
     key: str, value: object, operator: str, merge_pattern: str
 ) -> Callable[[Any], bool]:
-    """Create a function that will evaluate the comparison condition.
-
-    Args:
-        key (str): The key in the Mapping to be compared.
-        value (Any): The value to be compared.
-        operator (str): The operator used in the condition e.g `=`, `>`, ...
-        merge_pattern (str): The pattern to merge the regex patterns.
-
-    Returns:
-        Callable: The function that will evaluate the comparison condition.
-    """
+    """Build the function evaluating a single `key`/`op`/`value` comparison."""
     try:
         operator_enum = ComparisonOperator(operator)
     except ValueError:
@@ -183,15 +129,10 @@ def _validate_and_normalize_comparison_condition_data(
     operator_enum: ComparisonOperator,
     merge_pattern: str,
 ) -> tuple[Any, ComparisonOperator]:
-    """Validate and normalize the value based on the operator.
+    """Check the value suits the operator, and put it in the form the operator wants.
 
-    Args:
-        value (Any): The value to be validated
-        operator_enum (ComparisonOperator): The operator used in the condition
-        merge_pattern (str): The pattern to merge the regex patterns
-
-    Returns:
-        tuple[Any, ComparisonOperator]: The normalized value and operator
+    Regex values come back compiled, list values as a set, and a bool compared with
+    `=` or `!=` switches the operator to `is`/`is_not`.
     """
     if operator_enum in ComparisonOperatorRegexOnly:
         if isinstance(value, list):

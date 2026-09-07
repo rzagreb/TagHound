@@ -24,7 +24,7 @@ def run_scalar() -> None:
 
     print("Running scalar methods")
     for data in datas:
-        th.find_all_tags(data, multi_threaded=False)
+        th.find_all_tags(data)
 
 
 def run_vector() -> None:

@@ -16,10 +16,27 @@ from taghound.constants import (
     RuleKey,
 )
 from taghound.vector.function_builder import (
-    _evaluate_criteria,
-    _make_series_condition,
+    _build_criteria_function,
+    _build_series_condition,
     create_vector_function,
 )
+
+
+# The builders return a function; these apply it in one step, which is how the
+# assertions below read most clearly.
+def evaluate(df: pd.DataFrame, rule: dict, merge_pattern: str) -> pd.Series:
+    return _build_criteria_function(rule, merge_pattern=merge_pattern)(df)
+
+
+def series_condition(
+    df: pd.DataFrame, column: str, operator: str, value: object, merge_pattern: str
+) -> pd.Series:
+    return _build_series_condition(
+        column=column,
+        operator=operator,
+        const_value=value,
+        merge_pattern=merge_pattern,
+    )(df)
 
 
 @pytest.fixture
@@ -105,7 +122,7 @@ def test_create_vector_function_and(df: pd.DataFrame):
 
 
 def test_apply_condition_regex_match(df: pd.DataFrame):
-    result = _make_series_condition(
+    result = series_condition(
         df,
         "memo",
         ComparisonOperator.REGEX_MATCH.value,
@@ -117,7 +134,7 @@ def test_apply_condition_regex_match(df: pd.DataFrame):
 
 
 def test_apply_condition_regex_not_match(df: pd.DataFrame):
-    result = _make_series_condition(
+    result = series_condition(
         df,
         "memo",
         ComparisonOperator.REGEX_NOT_MATCH.value,
@@ -129,7 +146,7 @@ def test_apply_condition_regex_not_match(df: pd.DataFrame):
 
 
 def test_apply_condition_equal(df: pd.DataFrame):
-    result = _make_series_condition(
+    result = series_condition(
         df,
         "recurring",
         ComparisonOperator.EQUAL.value,
@@ -141,7 +158,7 @@ def test_apply_condition_equal(df: pd.DataFrame):
 
 
 def test_apply_condition_not_equal(df: pd.DataFrame):
-    result = _make_series_condition(
+    result = series_condition(
         df,
         "recurring",
         ComparisonOperator.NOT_EQUAL.value,
@@ -153,7 +170,7 @@ def test_apply_condition_not_equal(df: pd.DataFrame):
 
 
 def test_apply_condition_in(df: pd.DataFrame):
-    result = _make_series_condition(
+    result = series_condition(
         df,
         "city",
         ComparisonOperator.IN.value,
@@ -165,7 +182,7 @@ def test_apply_condition_in(df: pd.DataFrame):
 
 
 def test_apply_condition_not_in(df: pd.DataFrame):
-    result = _make_series_condition(
+    result = series_condition(
         df,
         "city",
         ComparisonOperator.NOT_IN.value,
@@ -178,7 +195,7 @@ def test_apply_condition_not_in(df: pd.DataFrame):
 
 def test_apply_condition_greater_than():
     frame = pd.DataFrame([{"height": 10}, {"height": 30}])
-    result = _make_series_condition(
+    result = series_condition(
         frame,
         "height",
         ComparisonOperator.GREATER_THAN.value,
@@ -189,7 +206,7 @@ def test_apply_condition_greater_than():
     pd.testing.assert_series_equal(result, expected)
 
 
-def test_evaluate_criteria_missing_op_defaults_to_equal(df: pd.DataFrame):
+def test_criteria_missing_op_defaults_to_equal(df: pd.DataFrame):
     rule = {
         LogicalOperator.AND.value: [
             {
@@ -198,12 +215,12 @@ def test_evaluate_criteria_missing_op_defaults_to_equal(df: pd.DataFrame):
             }
         ]
     }
-    result = _evaluate_criteria(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
+    result = evaluate(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
     expected = pd.Series([True, False, False, True])
     pd.testing.assert_series_equal(result, expected)
 
 
-def test_evaluate_criteria_or(df: pd.DataFrame):
+def test_criteria_or(df: pd.DataFrame):
     rule = {
         LogicalOperator.OR.value: [
             {
@@ -218,12 +235,12 @@ def test_evaluate_criteria_or(df: pd.DataFrame):
             },
         ]
     }
-    result = _evaluate_criteria(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
+    result = evaluate(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
     expected = pd.Series([True, True, True, True])
     pd.testing.assert_series_equal(result, expected)
 
 
-def test_evaluate_criteria_and(df: pd.DataFrame):
+def test_criteria_and(df: pd.DataFrame):
     rule = {
         LogicalOperator.AND.value: [
             {
@@ -238,18 +255,18 @@ def test_evaluate_criteria_and(df: pd.DataFrame):
             },
         ]
     }
-    result = _evaluate_criteria(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
+    result = evaluate(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)
     expected = pd.Series([True, False, False, True])
     pd.testing.assert_series_equal(result, expected)
 
 
-def test_evaluate_criteria_invalid(df: pd.DataFrame):
+def test_criteria_invalid(df: pd.DataFrame):
     rule = {
         ComparisonKey.KEY.value: "memo",
         ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
     }
     with pytest.raises(ValueError):
-        _evaluate_criteria(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)  # type: ignore
+        evaluate(df, rule, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN)  # type: ignore
 
 
 def test_create_vector_function_invalid_rule():
@@ -298,7 +315,7 @@ def test_re2_safe_merge_pattern_matches_punctuation_edges(
         ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
         ComparisonKey.VALUE.value: pattern,
     }
-    result = _evaluate_criteria(
+    result = evaluate(
         punctuation_df, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN
     )
     pd.testing.assert_series_equal(result, pd.Series(expected, name="memo"))
@@ -319,10 +336,10 @@ def test_re2_safe_merge_pattern_agrees_with_lookaround_default(
         ComparisonKey.VALUE.value: pattern,
     }
     object_df = punctuation_df.astype({"memo": "object"})
-    lookaround = _evaluate_criteria(
+    lookaround = evaluate(
         object_df, condition, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
     )
-    re2_safe = _evaluate_criteria(
+    re2_safe = evaluate(
         punctuation_df, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN
     )
     pd.testing.assert_series_equal(re2_safe, lookaround)
@@ -336,7 +353,7 @@ def test_word_bounded_pattern_is_not_over_matched(punctuation_df: pd.DataFrame):
         ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
         ComparisonKey.VALUE.value: "python",
     }
-    result = _evaluate_criteria(
+    result = evaluate(
         punctuation_df, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN
     )
     expected = pd.Series([False, False, False, True, False, False], name="memo")
@@ -372,9 +389,7 @@ def test_a_missing_number_is_not_a_match(dtype, operator, value, expected):
         ComparisonKey.OPERATOR.value: operator,
         ComparisonKey.VALUE.value: value,
     }
-    result = _evaluate_criteria(
-        frame, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN
-    )
+    result = evaluate(frame, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN)
     assert list(result) == expected
     # The and/or masks and the final to_numpy(dtype=bool) both refuse NA.
     assert result.dtype == bool
@@ -398,8 +413,36 @@ def test_a_missing_string_is_not_a_match(dtype, operator, value, expected):
         ComparisonKey.OPERATOR.value: operator,
         ComparisonKey.VALUE.value: value,
     }
-    result = _evaluate_criteria(
-        frame, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN
-    )
+    result = evaluate(frame, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN)
     assert list(result) == expected
+    assert result.dtype == bool
+
+
+# --- Empty frames -----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [
+        pd.DataFrame(),
+        pd.DataFrame({"memo": pd.Series([], dtype="string[pyarrow]")}),
+    ],
+    ids=["no columns at all", "typed but rowless"],
+)
+def test_an_empty_frame_yields_an_empty_bool_mask(frame: pd.DataFrame):
+    """Object dtype here would reach the and/or masks and to_numpy, which refuse it."""
+    rule = {
+        RuleKey.ROOT_AND.value: [
+            {
+                ComparisonKey.KEY.value: "memo",
+                ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
+                ComparisonKey.VALUE.value: "annual",
+            }
+        ]
+    }
+    func = create_vector_function(rule, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN)
+
+    result = func(frame)
+
+    assert len(result) == 0
     assert result.dtype == bool

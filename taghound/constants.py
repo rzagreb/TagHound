@@ -46,10 +46,6 @@ ComparisonOperatorNumericOnly = {
     ComparisonOperator.LESS_THAN,
     ComparisonOperator.LESS_THAN_OR_EQUAL,
 }
-ComparisonOperatorBoolOnly = {
-    ComparisonOperator.IS,
-    ComparisonOperator.IS_NOT,
-}
 ComparisonOperatorListOnly = {
     ComparisonOperator.IN,
     ComparisonOperator.NOT_IN,
@@ -76,10 +72,8 @@ class ComparisonKey(Enum):
 
 
 DEFAULT_COMPARISON_OPERATOR = ComparisonOperator.EQUAL
-""" Default comparison operator to use when not specified """
 
 DEFAULT_WEIGHT = 0.0
-""" Default weight to use when not specified """
 
 # - This is better than \b...\b because it also matches cases like `C++`
 # - Limitations: does not work when we need to match `.python` with `python` pattern

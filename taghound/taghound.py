@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import yaml
 
 from taghound.constants import (
     DEFAULT_REGEX_MERGE_PATTERN,
@@ -18,33 +20,22 @@ from taghound.serializers import to_tag_rule
 
 
 class TagHound:
-    """Holds a set of tag rules and finds the tags matching given data."""
+    """Holds a set of tag rules and finds the tags matching given data.
+
+    The `rules_from_*` loaders share four knobs. `version` is the rule file format
+    version, and only "1" exists. `add_scalar_func` and `add_vector_fn` choose which
+    of the two check functions each rule gets built. `merge_pattern` wraps every
+    regex on the scalar path, which runs on Python `re`; `vector_merge_pattern` does
+    the same for the vectorized path, which runs on RE2 for pyarrow-backed columns
+    and therefore has to stay RE2-safe.
+    """
 
     def __init__(self, rules: list[TagRule]) -> None:
-        """Initialize the TagHound object.
-
-        Args:
-            rules (list[TagRule]): The rules to search tags with.
-        """
+        """Hold `rules` and build the lookups derived from them."""
         self.set_rules(rules)
 
-    def find_all_tags(
-        self,
-        data: Mapping[str, Any],
-        multi_threaded: bool = False,
-        thread_exec_params: dict | None = None,
-    ) -> tuple[str, ...]:
-        """Find all tags in the data.
-
-        Args:
-            data (Mapping[str, Any]): The data to search for tags
-            multi_threaded (bool): Whether to use multi-threading to search for tags
-                NOTE: rule checks are CPU-bound Python, so threads usually add
-                overhead instead of speed; measure before enabling
-            thread_exec_params (Optional[dict]): The parameters to pass to the ThreadPoolExecutor
-
-        Returns:
-            tuple[str, ...]: The ids of the rules that matched the data
+    def find_all_tags(self, data: Mapping[str, Any]) -> tuple[str, ...]:
+        """Return the ids of every rule matching one mapping.
 
         Example:
             >>> from taghound.models import TagRule
@@ -65,32 +56,18 @@ class TagHound:
         if not self.__rules:
             raise ValueError("No rules to search for tags")
 
+        if not self.__has_scalar_checks:
+            raise ValueError(
+                "Some rules have no scalar check function, so they were loaded with "
+                "add_scalar_func=False. Reload with it on, or use find_tags_using_vector."
+            )
+
         if not self.__required_fields.issubset(data.keys()):
             raise ValueError(
                 f"Missing required fields: {self.__required_fields - data.keys()}"
             )
 
-        if multi_threaded:
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-
-            thread_exec_params = thread_exec_params or {}
-
-            tag_ids: list[str] = []
-            with ThreadPoolExecutor(**thread_exec_params) as executor:
-                future_to_rule = {}
-                for rule in self.__rules:
-                    if not rule.scalar_check:
-                        raise ValueError("No scalar check function found")
-                    future_to_rule[executor.submit(rule.scalar_check, data)] = rule
-
-                for future in as_completed(future_to_rule):
-                    rule: TagRule = future_to_rule[future]
-                    if future.result():
-                        tag_ids.append(rule.id)
-
-            return tuple(tag_ids)
-        else:
-            return tuple(rule.id for rule in self.__rules if rule.scalar_check(data))  # type: ignore
+        return tuple(rule.id for rule in self.__rules if rule.scalar_check(data))  # type: ignore
 
     def find_tags_using_vector(
         self,
@@ -98,19 +75,15 @@ class TagHound:
         output_format: str = "list",
         output_column_name: str = "tags",
     ) -> pd.DataFrame:
-        """Find tags in the data using vectorized operations.
+        """Find tags across a whole DataFrame at once.
 
-        Evaluates every rule against the whole DataFrame at once; this usually
-        pays off over `find_all_tags` for large batches — measure for your own
-        rule set and data sizes.
+        Every rule is evaluated against all rows in one pass, which usually pays off
+        over `find_all_tags` for large batches; measure for your own rule set and
+        data sizes.
 
-        Args:
-            data (Union[pd.DataFrame, list[Mapping[str, Any]]]): The data to search for tags
-            output_format (str): The format of the output. Supported values are 'list' and 'columns'
-            output_column_name (str): The name of the column to store the tags
-
-        Returns:
-            pd.DataFrame: The data with an additional column 'tags' containing the assigned tags
+        `output_format="list"` names the matching rule ids in a single column and
+        returns the caller's own DataFrame, mutated in place. `"columns"` returns a
+        copy carrying one boolean column per rule.
         """
         if not self.__rules:
             raise ValueError("No rules to search for tags")
@@ -120,10 +93,13 @@ class TagHound:
         elif isinstance(data, pd.DataFrame):
             df = data
         else:
-            raise ValueError(f"Unsupported data type: {type(data)}")
+            # TypeError would be the better fit, but this has been a ValueError
+            # since 0.1 and callers catch it; same reasoning as the ValueError /
+            # TypeError bases in exceptions.py.
+            raise ValueError(f"Unsupported data type: {type(data)}")  # noqa: TRY004
 
         tags = {}
-        for rule in self.rules:
+        for rule in self.__rules:
             if not rule.vector_check:
                 raise ValueError("No vector check function found")
             tags[rule.id] = rule.vector_check(df)
@@ -131,8 +107,6 @@ class TagHound:
         tags_df = pd.DataFrame(tags)
 
         if output_format == "list":
-            # NaN (e.g. regex matches on missing values) stays truthy, as it
-            # was when this used `if match` on each cell
             bool_matrix = tags_df.to_numpy(dtype=bool)
             tag_ids = tags_df.columns.to_numpy()
             df[output_column_name] = pd.Series(
@@ -163,27 +137,29 @@ class TagHound:
         return self.__rule_id_to_label_map
 
     def set_rules(self, rules: list[TagRule]) -> None:
-        """Set the rules for the TagHound object.
-
-        Args:
-            rules (list[TagRule]): The rules to search tags with.
-        """
+        """Replace the rule set and rebuild everything derived from it."""
         self.__rules = rules
         self.__required_fields = set().union(
             *(rule.required_fields for rule in self.__rules)
+        )
+        self.__has_scalar_checks = all(
+            rule.scalar_check is not None for rule in self.__rules
         )
 
         self.__rule_id_to_weight_map = {rule.id: rule.weight for rule in self.__rules}
         self.__rule_id_to_label_map = {rule.id: rule.label for rule in self.__rules}
 
     def add_rule(self, rule: TagRule) -> None:
-        """Add a rule to the TagHound object.
+        """Append one rule and update the lookups derived from the set.
 
-        Args:
-            rule (TagRule): The rule to add.
+        There is no duplicate-`id` check here; that belongs to the loaders, which
+        see the whole set at once. Adding an id already present leaves the weight
+        and label maps holding the newcomer while `output_format="columns"` emits
+        the id twice.
         """
         self.__rules.append(rule)
         self.__required_fields.update(rule.required_fields)
+        self.__has_scalar_checks &= rule.scalar_check is not None
 
         self.__rule_id_to_weight_map[rule.id] = rule.weight
         self.__rule_id_to_label_map[rule.id] = rule.label
@@ -198,19 +174,10 @@ class TagHound:
         merge_pattern: str,
         vector_merge_pattern: str,
     ) -> TagHound:
-        """Create a TagHound from already-parsed rule dicts.
+        """Build a TagHound from already-parsed rule dicts.
 
-        Args:
-            data (list[Mapping[str, Any]]): The parsed rule definitions.
-            version (str): The version of the file format.
-            add_scalar_func (bool): Whether to add scalar functions to the rules.
-            add_vector_fn (bool): Whether to add vector functions to the rules.
-            merge_pattern (str): The merge pattern for the scalar path.
-            vector_merge_pattern (str): The merge pattern for the vectorized
-                path. Must be RE2-safe.
-
-        Returns:
-            TagHound: A TagHound object with the given rules.
+        The single funnel every loader passes through, so cross-rule checks such as
+        the duplicate-`id` refusal belong here rather than in each `rules_from_*`.
         """
         if version != "1":
             raise ValueError(f"Unsupported version: {version}")
@@ -248,25 +215,9 @@ class TagHound:
         merge_pattern: str = DEFAULT_REGEX_MERGE_PATTERN,
         vector_merge_pattern: str = RE2_SAFE_REGEX_MERGE_PATTERN,
     ) -> TagHound:
-        """Load rules from a YAML file.
-
-        Args:
-            filepath (str): The file path to load the rules
-            version (str): The version of the file format
-            add_scalar_func (bool): Whether to add scalar functions to the rules
-            add_vector_fn (bool): Whether to add vector functions to the rules
-            merge_pattern (str): The merge pattern for the scalar path
-            vector_merge_pattern (str): The merge pattern for the vectorized
-                path. Must be RE2-safe.
-
-        Returns:
-            TagHound: A TagHound object with the rules loaded from the file
-        """
-        import yaml
-
-        data = yaml.safe_load(Path(filepath).read_text())
+        """Load rules from a YAML file. See the class docstring for the knobs."""
         return cls._from_rule_dicts(
-            data,
+            yaml.safe_load(Path(filepath).read_text()),
             version=version,
             add_scalar_func=add_scalar_func,
             add_vector_fn=add_vector_fn,
@@ -286,23 +237,9 @@ class TagHound:
     ) -> TagHound:
         """Load rules from YAML text, for rules that never were a file.
 
-        The counterpart to `taghound.serializers.dump_rules`, and what to use
-        when the rules arrive from a database row or an upload.
-
-        Args:
-            text (str): The YAML document holding the rules
-            version (str): The version of the file format
-            add_scalar_func (bool): Whether to add scalar functions to the rules
-            add_vector_fn (bool): Whether to add vector functions to the rules
-            merge_pattern (str): The merge pattern for the scalar path
-            vector_merge_pattern (str): The merge pattern for the vectorized
-                path. Must be RE2-safe.
-
-        Returns:
-            TagHound: A TagHound object with the rules read from the text
+        The counterpart to `taghound.serializers.dump_rules`, and what to use when
+        the rules arrive from a database row or an upload.
         """
-        import yaml
-
         return cls._from_rule_dicts(
             yaml.safe_load(text),
             version=version,
@@ -322,25 +259,9 @@ class TagHound:
         merge_pattern: str = DEFAULT_REGEX_MERGE_PATTERN,
         vector_merge_pattern: str = RE2_SAFE_REGEX_MERGE_PATTERN,
     ) -> TagHound:
-        """Load rules from a JSON file.
-
-        Args:
-            filepath (str): The file path to load the rules
-            version (str): The version of the file format
-            add_scalar_func (bool): Whether to add scalar functions to the rules
-            add_vector_fn (bool): Whether to add vector functions to the rules
-            merge_pattern (str): The merge pattern for the scalar path
-            vector_merge_pattern (str): The merge pattern for the vectorized
-                path. Must be RE2-safe.
-
-        Returns:
-            TagHound: A TagHound object with the rules loaded from the file
-        """
-        import json
-
-        data = json.loads(Path(filepath).read_text())
+        """Load rules from a JSON file. See the class docstring for the knobs."""
         return cls._from_rule_dicts(
-            data,
+            json.loads(Path(filepath).read_text()),
             version=version,
             add_scalar_func=add_scalar_func,
             add_vector_fn=add_vector_fn,

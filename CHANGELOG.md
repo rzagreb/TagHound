@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## [0.6.0] 2026-09-06
+
+### Removed
+
+- **Breaking:** `find_all_tags` no longer takes `multi_threaded` or `thread_exec_params`. Rule checks are CPU-bound Python, so the threads cost more than they saved; drop the argument.
+- `ComparisonOperatorBoolOnly` from `taghound.constants`, which nothing read.
+
+### Fixed
+
+- `find_all_tags` now names the problem when rules were loaded with `add_scalar_func=False`, instead of failing with `'NoneType' object is not callable`.
+- Vector conditions on an empty DataFrame return a bool Series rather than an object one, matching every other evaluation path.
+
 ## [0.5.0] 2026-09-06
 
 ### Added

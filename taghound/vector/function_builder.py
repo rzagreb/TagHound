@@ -32,17 +32,10 @@ _NUMERIC_OPERATORS: Mapping[ComparisonOperator, Callable] = {
 
 
 def create_vector_function(rule: Mapping[str, Any], merge_pattern: str) -> PdEvalFn:
-    """Create a function that will evaluate the vector condition.
+    """Build the function that evaluates `rule` against a DataFrame.
 
     The rule tree is parsed and validated once here; the returned function only
-    applies the prebuilt column operations to the given DataFrame.
-
-    Args:
-        rule (Mapping[str, Any]): The rule to evaluate.
-        merge_pattern (str): The pattern to merge the regex patterns.
-
-    Returns:
-        PdEvalFn: The function that will evaluate the vector condition.
+    applies the prebuilt column operations to the frame it is given.
     """
     if not isinstance(rule, dict):
         raise InvalidRuleTypeError(f"Rule must be a dictionary. Given: {type(rule)}")
@@ -56,23 +49,20 @@ def create_vector_function(rule: Mapping[str, Any], merge_pattern: str) -> PdEva
     criteria_fn = _build_criteria_function(rule, merge_pattern=merge_pattern)
 
     def vector_mask(df: pd.DataFrame) -> pd.Series:
+        # Guards the frame with no columns at all (`pd.DataFrame([])`), which would
+        # otherwise fail `_get_column`. A typed but rowless frame needs no guard.
         if df.empty:
-            return pd.Series([False] * len(df), index=df.index)
+            return pd.Series(False, index=df.index, dtype=bool)
         return criteria_fn(df)
 
     return vector_mask
 
 
 def _build_criteria_function(rule: Mapping[str, Any], merge_pattern: str) -> PdEvalFn:
-    """Recursively build the evaluation function for a rule node.
+    """Recursively build the evaluation function for one node of a rule tree.
 
-    Args:
-        rule (Mapping[str, Any]): A logical node (`and`/`or` over child nodes)
-            or a comparison condition (`key`/`op`/`value`).
-        merge_pattern (str): The pattern to merge the regex patterns.
-
-    Returns:
-        PdEvalFn: The function that evaluates this node against a DataFrame.
+    A node is either a logical `and`/`or` over children, or a `key`/`op`/`value`
+    comparison.
     """
     if LogicalOperator.AND.value in rule:
         child_fns = [
@@ -136,17 +126,7 @@ def _build_series_condition(
     const_value: object,
     merge_pattern: str,
 ) -> PdEvalFn:
-    """Build a Series condition function for a single comparison.
-
-    Args:
-        column (str): The column to evaluate.
-        operator (str): The operator to use.
-        const_value (object): The value to compare against.
-        merge_pattern (str): The merge pattern to use for regex operators.
-
-    Returns:
-        PdEvalFn: A function evaluating the comparison against a DataFrame.
-    """
+    """Build the function evaluating a single comparison against a DataFrame."""
     try:
         operator_enum = ComparisonOperator(operator)
     except ValueError:
@@ -242,60 +222,7 @@ def _as_bool_mask(mask: pd.Series) -> pd.Series:
 
 
 def _get_column(df: pd.DataFrame, column: str) -> pd.Series:
-    """Return the column, raising if the DataFrame does not have it.
-
-    Args:
-        df (pd.DataFrame): The DataFrame to read from.
-        column (str): The column name.
-
-    Returns:
-        pd.Series: The column values.
-    """
+    """Return the column, raising if the DataFrame does not have it."""
     if column not in df.columns:
         raise InvalidRuleError(f"Column '{column}' not found in DataFrame.")
     return df[column]
-
-
-def _evaluate_criteria(
-    df: pd.DataFrame, rule: Mapping[str, list | dict], merge_pattern: str
-) -> pd.Series:
-    """Evaluate the criteria based on the rule (compatibility wrapper).
-
-    Args:
-        df (pd.DataFrame): The DataFrame to evaluate.
-        rule (Mapping[str, Union[list, dict]]): The rule to evaluate.
-        merge_pattern (str): The pattern to merge the regex patterns.
-
-    Returns:
-        pd.Series: The Series condition.
-    """
-    if df.empty:
-        return pd.Series([False] * len(df), index=df.index)
-    return _build_criteria_function(rule, merge_pattern=merge_pattern)(df)
-
-
-def _make_series_condition(
-    df: pd.DataFrame,
-    column: str,
-    operator: str,
-    const_value: str | list | bool,
-    merge_pattern: str,
-) -> pd.Series:
-    """Create and apply a Series condition (compatibility wrapper).
-
-    Args:
-        df (pd.DataFrame): The DataFrame to evaluate.
-        column (str): The column to evaluate.
-        operator (str): The operator to use.
-        const_value (Union[str, list, bool]): The value to compare against.
-        merge_pattern (str): The merge pattern to use.
-
-    Returns:
-        pd.Series: The Series condition.
-    """
-    return _build_series_condition(
-        column=column,
-        operator=operator,
-        const_value=const_value,
-        merge_pattern=merge_pattern,
-    )(df)
