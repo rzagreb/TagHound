@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## [0.5.0] 2026-09-06
+
+### Added
+
+- `taghound.serializers.dump_rules` and `dump_conditions` — write rules back out as the YAML the loaders read. The library could read a rules file but not produce one, so anything storing rules outside a file (a database table, an editor with a download button) had to hand-roll the four things that make regex-bearing YAML safe: quoting every pattern, never folding a long line, indenting sequences under their key, and a fixed `key`/`op`/`value` order.
+- `TagHound.rules_from_string` — load rules from YAML text. `rules_from_yaml` takes a path, which an upload does not have.
+- `taghound.re2.check_re2_safe` — checks a pattern against the syntax RE2 accepts.
+- `TagHoundError`, a base for everything the library raises, so one `except` covers it. `InvalidRuleError` and `InvalidRuleTypeError` also inherit `ValueError` and `TypeError` respectively, so code catching those is unaffected. New `RE2UnsupportedError` and `DuplicateRuleIdError` sit under it.
+- README section on text dtypes, RE2 and missing values.
+
+### Fixed
+
+- **Nullable dtypes no longer break the vectorized path.** 0.3.0 resolved nulls to "no match" on the regex branch only; the numeric, membership and equality branches still leaked `<NA>` into the and/or masks. An `Int64` column with a gap raised `ValueError: cannot convert to 'bool'-dtype NumPy array with missing values`, and — worse, because it is the dtype this library's own design steers you toward — `string[pyarrow]` with `=` raised `TypeError: boolean value of NA is ambiguous`. Every branch now resolves a null to "did not match" before any negation, so `!=` and `not_in` treat a missing cell the way `!~` already did. Callers working around this by casting to `float64` can stop.
+- Two rules sharing an `id` now raise `DuplicateRuleIdError` at load. They used to load quietly and then disagree about themselves: the weight and label maps kept the last one, while `output_format="columns"` emitted the id twice.
+
+### Changed
+
+- **Breaking:** a pattern using look-ahead, look-behind, a backreference or an atomic group is refused when the rule is built, rather than working on an `object` column and raising inside pyarrow on a `string[pyarrow]` one. Rules relying on this were already a latent break — the same rule set meant two different things depending on a dtype their author never sees. The error names the construct. Only the pattern the rule's author wrote is checked; a `vector_merge_pattern` you pass yourself is left alone, since that is a deliberate choice and may be look-around on purpose for object columns.
+
 ## [0.4.0] 2026-08-06
 
 ### Added
