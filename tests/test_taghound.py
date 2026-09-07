@@ -16,7 +16,7 @@ from taghound.constants import ComparisonKey, LogicalOperator, RuleKey
 from taghound.models import TagRule
 from taghound.taghound import TagHound
 
-RULE_ID = "sector_group/advanced_filtering2"
+RULE_ID = "spend/recurring_review"
 
 
 def sample_rule_data() -> list[dict[str, Any]]:
@@ -24,58 +24,58 @@ def sample_rule_data() -> list[dict[str, Any]]:
     return [
         {
             RuleKey.ID.value: RULE_ID,
-            RuleKey.LABEL.value: "Advanced Filtering 2",
+            RuleKey.LABEL.value: "Recurring Review",
             RuleKey.WEIGHT.value: -150,
             LogicalOperator.OR.value: [
                 {
                     LogicalOperator.AND.value: [
                         {
-                            ComparisonKey.KEY.value: "description",
+                            ComparisonKey.KEY.value: "memo",
                             ComparisonKey.OPERATOR.value: "~",
-                            ComparisonKey.VALUE.value: "(government contract|public sector)",
+                            ComparisonKey.VALUE.value: "(annual renewal|auto-renew)",
                         }
                     ]
                 },
                 {
                     LogicalOperator.AND.value: [
                         {
-                            ComparisonKey.KEY.value: "description",
+                            ComparisonKey.KEY.value: "memo",
                             ComparisonKey.OPERATOR.value: "~",
-                            ComparisonKey.VALUE.value: "(government contract|public sector)",
+                            ComparisonKey.VALUE.value: "(annual renewal|auto-renew)",
                         },
                         {
-                            ComparisonKey.KEY.value: "title",
+                            ComparisonKey.KEY.value: "merchant",
                             ComparisonKey.OPERATOR.value: "!~",
                             ComparisonKey.VALUE.value: [
-                                "data",
-                                "analyst",
-                                "intern",
-                                "junior",
+                                "grocer",
+                                "transit",
+                                "pharmacy",
+                                "parking",
                             ],
                         },
                         {
-                            ComparisonKey.KEY.value: "location",
+                            ComparisonKey.KEY.value: "city",
                             ComparisonKey.OPERATOR.value: "in",
-                            ComparisonKey.VALUE.value: ["Washington", "New York"],
+                            ComparisonKey.VALUE.value: ["Portland", "Seattle"],
                         },
                         {
                             LogicalOperator.OR.value: [
                                 {
-                                    ComparisonKey.KEY.value: "clearance_required",
+                                    ComparisonKey.KEY.value: "recurring",
                                     ComparisonKey.OPERATOR.value: "=",
                                     ComparisonKey.VALUE.value: "false",
                                 },
                                 {
                                     LogicalOperator.AND.value: [
                                         {
-                                            ComparisonKey.KEY.value: "clearance_required",
+                                            ComparisonKey.KEY.value: "recurring",
                                             ComparisonKey.OPERATOR.value: "=",
                                             ComparisonKey.VALUE.value: "true",
                                         },
                                         {
-                                            ComparisonKey.KEY.value: "clearance_level",
+                                            ComparisonKey.KEY.value: "plan",
                                             ComparisonKey.OPERATOR.value: "=",
-                                            ComparisonKey.VALUE.value: "Top Secret",
+                                            ComparisonKey.VALUE.value: "Annual",
                                         },
                                     ]
                                 },
@@ -94,25 +94,24 @@ def rules() -> list[TagRule]:
     return [
         TagRule(
             id=RULE_ID,
-            label="Advanced Filtering 2",
+            label="Recurring Review",
             weight=-150,
             required_fields={
-                "description",
-                "title",
-                "location",
-                "clearance_required",
-                "clearance_level",
+                "memo",
+                "merchant",
+                "city",
+                "recurring",
+                "plan",
             },
             scalar_check=lambda d: (
-                bool(re.search("(government contract|public sector)", d["description"]))
-                and not bool(re.search("(data|analyst|intern|junior)", d["title"]))
-                and d["location"] in ["Washington", "New York"]
+                bool(re.search("(annual renewal|auto-renew)", d["memo"]))
+                and not bool(
+                    re.search("(grocer|transit|pharmacy|parking)", d["merchant"])
+                )
+                and d["city"] in ["Portland", "Seattle"]
                 and (
-                    d["clearance_required"] == "false"
-                    or (
-                        d["clearance_required"] == "true"
-                        and d["clearance_level"] == "Top Secret"
-                    )
+                    d["recurring"] == "false"
+                    or (d["recurring"] == "true" and d["plan"] == "Annual")
                 )
             ),
         )
@@ -127,51 +126,53 @@ def th(rules: list[TagRule]) -> TagHound:
 
 def test_find_all_tags(th: TagHound):
     data = {
-        "description": "government contract",
-        "title": "senior developer",
-        "location": "Washington",
-        "clearance_required": "true",
-        "clearance_level": "Top Secret",
+        "memo": "annual renewal",
+        "merchant": "blue bottle",
+        "city": "Portland",
+        "recurring": "true",
+        "plan": "Annual",
     }
     assert th.find_all_tags(data) == (RULE_ID,)
 
     data = {
-        "description": "public sector",
-        "title": "junior developer",
-        "location": "New York",
-        "clearance_required": "false",
-        "clearance_level": "Top Secret",
+        "memo": "auto-renew",
+        "merchant": "corner grocer",
+        "city": "Seattle",
+        "recurring": "false",
+        "plan": "Annual",
     }
-    assert th.find_all_tags(data) == ()  # title contains "junior"
+    assert th.find_all_tags(data) == ()  # merchant is on the excluded list
 
     data = {
-        "description": "public sector",
-        "title": "senior developer",
-        "location": "Chicago",
-        "clearance_required": "false",
-        "clearance_level": "Top Secret",
+        "memo": "auto-renew",
+        "merchant": "blue bottle",
+        "city": "Austin",
+        "recurring": "false",
+        "plan": "Annual",
     }
-    assert th.find_all_tags(data) == ()  # location is not Washington or New York
+    assert th.find_all_tags(data) == ()  # city is not Portland or Seattle
 
 
 def test_find_all_tags_multithread(th: TagHound):
     data = {
-        "description": "government contract",
-        "title": "senior developer",
-        "location": "Washington",
-        "clearance_required": "true",
-        "clearance_level": "Top Secret",
+        "memo": "annual renewal",
+        "merchant": "blue bottle",
+        "city": "Portland",
+        "recurring": "true",
+        "plan": "Annual",
     }
     assert th.find_all_tags(data, multi_threaded=True) == (RULE_ID,)
 
     data = {
-        "description": "public sector",
-        "title": "junior developer",
-        "location": "New York",
-        "clearance_required": "false",
-        "clearance_level": "Top Secret",
+        "memo": "auto-renew",
+        "merchant": "corner grocer",
+        "city": "Seattle",
+        "recurring": "false",
+        "plan": "Annual",
     }
-    assert th.find_all_tags(data, multi_threaded=True) == ()  # title contains "junior"
+    assert (
+        th.find_all_tags(data, multi_threaded=True) == ()
+    )  # merchant is on the excluded list
 
 
 def test_rules_from_yaml(tmp_path: Path, rules: list[TagRule]):

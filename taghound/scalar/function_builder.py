@@ -17,7 +17,12 @@ from taghound.constants import (
     PyEvalFn,
     RuleKey,
 )
-from taghound.exceptions import InvalidOperatorError, MissingRootConditionError
+from taghound.exceptions import (
+    InvalidOperatorError,
+    InvalidRuleError,
+    InvalidRuleTypeError,
+    MissingRootConditionError,
+)
 from taghound.scalar.operators import ComparisonOperatorMap, LogicalOperatorMap
 
 
@@ -115,14 +120,16 @@ def _parse_conditions(
 
     """
     if not isinstance(conditions, Sequence):
-        raise TypeError(f"Must be list. Given: `{type(conditions)}`")
+        raise InvalidRuleTypeError(f"Must be list. Given: `{type(conditions)}`")
 
     comparison_fns = []
     for condition in conditions:
         if not isinstance(condition, Mapping):
-            raise TypeError(f"Expected a Mapping. Given: `{type(condition)}`")
+            raise InvalidRuleTypeError(
+                f"Expected a Mapping. Given: `{type(condition)}`"
+            )
         if not condition:
-            raise ValueError("Empty Mapping found in logical conditions.")
+            raise InvalidRuleError("Empty Mapping found in logical conditions.")
 
         if len(condition.keys()) == 1:
             conditions_fn = _create_logic_function(
@@ -156,7 +163,10 @@ def _make_comparison_condition_function(
     Returns:
         Callable: The function that will evaluate the comparison condition.
     """
-    operator_enum = ComparisonOperator(operator)
+    try:
+        operator_enum = ComparisonOperator(operator)
+    except ValueError:
+        raise InvalidRuleError(f"Unsupported operation: {operator}")
 
     value, operator_enum = _validate_and_normalize_comparison_condition_data(
         value, operator_enum, merge_pattern
@@ -189,22 +199,24 @@ def _validate_and_normalize_comparison_condition_data(
         elif isinstance(value, str):
             pattern_str = value
         else:
-            raise ValueError(f"Invalid value for regex match: `{value}` ({type(value)}")
+            raise InvalidRuleError(
+                f"Invalid value for regex match: `{value}` ({type(value)}"
+            )
 
         try:
             value = re.compile(merge_pattern.format(pattern=pattern_str), re.IGNORECASE)
         except re.error:
-            raise ValueError(f"Invalid regex pattern: `{pattern_str}`")
+            raise InvalidRuleError(f"Invalid regex pattern: `{pattern_str}`")
 
     elif operator_enum in ComparisonOperatorNumericOnly:
         if not isinstance(value, (int, float)):
-            raise ValueError(
+            raise InvalidRuleError(
                 f"Invalid value for number comparison: `{value}` ({type(value)})"
             )
 
     elif operator_enum in ComparisonOperatorListOnly:
         if not isinstance(value, (list, tuple, set)):
-            raise ValueError(
+            raise InvalidRuleError(
                 f"Invalid value for list comparison: `{value}` ({type(value)}"
             )
         value = set(value)

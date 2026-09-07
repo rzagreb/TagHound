@@ -20,6 +20,8 @@ from taghound.constants import (
     PdEvalFn,
     RuleKey,
 )
+from taghound.exceptions import InvalidRuleError, InvalidRuleTypeError
+from taghound.re2 import check_re2_safe
 
 _NUMERIC_OPERATORS: Mapping[ComparisonOperator, Callable] = {
     ComparisonOperator.GREATER_THAN: op.gt,
@@ -43,10 +45,10 @@ def create_vector_function(rule: Mapping[str, Any], merge_pattern: str) -> PdEva
         PdEvalFn: The function that will evaluate the vector condition.
     """
     if not isinstance(rule, dict):
-        raise TypeError(f"Rule must be a dictionary. Given: {type(rule)}")
+        raise InvalidRuleTypeError(f"Rule must be a dictionary. Given: {type(rule)}")
 
     if RuleKey.ROOT_OR.value not in rule and RuleKey.ROOT_AND.value not in rule:
-        raise ValueError(
+        raise InvalidRuleError(
             f"Rule must contain either '{RuleKey.ROOT_OR.value}' or "
             f"'{RuleKey.ROOT_AND.value}'."
         )
@@ -101,7 +103,7 @@ def _build_criteria_function(rule: Mapping[str, Any], merge_pattern: str) -> PdE
         return or_mask
 
     if ComparisonKey.KEY.value not in rule or ComparisonKey.VALUE.value not in rule:
-        raise ValueError(
+        raise InvalidRuleError(
             f"Criteria must contain '{ComparisonKey.KEY.value}' and "
             f"'{ComparisonKey.VALUE.value}'."
             f" Given: {rule.keys()}"
@@ -110,12 +112,12 @@ def _build_criteria_function(rule: Mapping[str, Any], merge_pattern: str) -> PdE
     operator = rule.get(ComparisonKey.OPERATOR.value, DEFAULT_COMPARISON_OPERATOR.value)
     const_value = rule[ComparisonKey.VALUE.value]
     if not isinstance(column, str):
-        raise ValueError(
+        raise InvalidRuleError(
             f"Value for key '{ComparisonKey.KEY.value}' must be a string. "
             f"Given: {type(column)}"
         )
     if not isinstance(operator, str):
-        raise ValueError(
+        raise InvalidRuleError(
             f"Value for key '{ComparisonKey.OPERATOR.value}' must be a string. "
             f"Given: {type(operator)}"
         )
@@ -148,7 +150,7 @@ def _build_series_condition(
     try:
         operator_enum = ComparisonOperator(operator)
     except ValueError:
-        raise ValueError(f"Unsupported operation: {operator}")
+        raise InvalidRuleError(f"Unsupported operation: {operator}")
 
     if operator_enum in ComparisonOperatorRegexOnly:
         pattern = (
@@ -159,46 +161,48 @@ def _build_series_condition(
         # `string[pyarrow]` columns. With the flag inline, pyarrow-backed columns
         # use the vectorised RE2 engine while object columns behave the same. Note
         # RE2 rejects look-around and backreferences.
+        # Checked before the merge wrapper goes on: the wrapper is the caller's
+        # explicit choice and may deliberately use look-around for object columns,
+        # whereas the pattern is what the rule's author wrote.
+        check_re2_safe(pattern)
         pattern = "(?i)" + merge_pattern.format(pattern=pattern)
         try:
             re.compile(pattern)
         except re.error:
-            raise ValueError(f"Invalid regex pattern: `{pattern}`")
+            raise InvalidRuleError(f"Invalid regex pattern: `{pattern}`")
         negate = operator_enum == ComparisonOperator.REGEX_NOT_MATCH
 
         def regex_condition(df: pd.DataFrame) -> pd.Series:
-            matches = _get_column(df, column).str.contains(pattern, regex=True)
-            # Missing values yield <NA>/NaN; treat them as "no match" and coerce
-            # to a plain bool Series so nullable (pyarrow) results don't leak NA
-            # into the and/or masks or the final `to_numpy(dtype=bool)`.
-            matches = matches.fillna(False).astype(bool)
+            matches = _as_bool_mask(
+                _get_column(df, column).str.contains(pattern, regex=True)
+            )
             return ~matches if negate else matches
 
         return regex_condition
 
     if operator_enum in ComparisonOperatorNumericOnly:
         if not isinstance(const_value, (int, float)):
-            raise ValueError(
+            raise InvalidRuleError(
                 f"Invalid value for number comparison: "
                 f"`{const_value}` ({type(const_value)})"
             )
         compare = _NUMERIC_OPERATORS[operator_enum]
 
         def numeric_condition(df: pd.DataFrame) -> pd.Series:
-            return compare(_get_column(df, column), const_value)
+            return _as_bool_mask(compare(_get_column(df, column), const_value))
 
         return numeric_condition
 
     if operator_enum in ComparisonOperatorListOnly:
         if not isinstance(const_value, (list, tuple, set)):
-            raise ValueError(
+            raise InvalidRuleError(
                 f"Value for operator '{operator}' must be a list."
                 f" Given: {type(const_value)}"
             )
         negate = operator_enum == ComparisonOperator.NOT_IN
 
         def membership_condition(df: pd.DataFrame) -> pd.Series:
-            mask = _get_column(df, column).isin(const_value)
+            mask = _as_bool_mask(_get_column(df, column).isin(const_value))
             return ~mask if negate else mask
 
         return membership_condition
@@ -211,16 +215,30 @@ def _build_series_condition(
     if isinstance(const_value, (list, tuple, set)):
 
         def equality_condition(df: pd.DataFrame) -> pd.Series:
-            mask = _get_column(df, column).isin(const_value)
+            mask = _as_bool_mask(_get_column(df, column).isin(const_value))
             return ~mask if negate else mask
 
     else:
 
         def equality_condition(df: pd.DataFrame) -> pd.Series:
-            series = _get_column(df, column)
-            return series != const_value if negate else series == const_value
+            # Negating the positive test rather than comparing with `!=` directly:
+            # a missing cell resolves to "did not match" first, so `!=` against it
+            # is True, the same way `!~` already treats one.
+            mask = _as_bool_mask(_get_column(df, column) == const_value)
+            return ~mask if negate else mask
 
     return equality_condition
+
+
+def _as_bool_mask(mask: pd.Series) -> pd.Series:
+    """Resolve a comparison result to a plain bool Series, nulls counting as no match.
+
+    Every branch funnels through here so a nullable dtype cannot leak `<NA>` into
+    the and/or masks or into the final `to_numpy(dtype=bool)`, both of which
+    refuse it. Casting to `boolean` before filling stops pandas guessing at the
+    result type of an object column, which it warns about and will change.
+    """
+    return mask.astype("boolean").fillna(False).astype(bool)
 
 
 def _get_column(df: pd.DataFrame, column: str) -> pd.Series:
@@ -234,7 +252,7 @@ def _get_column(df: pd.DataFrame, column: str) -> pd.Series:
         pd.Series: The column values.
     """
     if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame.")
+        raise InvalidRuleError(f"Column '{column}' not found in DataFrame.")
     return df[column]
 
 

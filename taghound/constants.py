@@ -91,6 +91,6 @@ DEFAULT_REGEX_MERGE_PATTERN = r"(?<!\w)(?:{pattern})(?!\w)"
 # by a word char" and "at the start or on a \W" are the same condition, so for the
 # boolean `contains` the vector path needs, the two are equivalent. Do NOT fall back
 # to \b...\b here: it silently drops every pattern that starts or ends with
-# punctuation, so `C++`, `C#` and `#LI-Remote` never match.
+# punctuation, so `C++`, `C#` and `#promo` never match.
 RE2_SAFE_REGEX_MERGE_PATTERN = r"(?:^|\W)(?:{pattern})(?:$|\W)"
 """ Merge pattern for the vectorized path, where look-around is unavailable """

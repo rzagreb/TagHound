@@ -14,6 +14,7 @@ from taghound.constants import (
     RuleKey,
 )
 from taghound.exceptions import (
+    InvalidRuleError,
     InvalidOperatorError,
     MissingRootConditionError,
     RuleAndOrTogetherError,
@@ -575,3 +576,9 @@ def test_get_required_keys_ignores_mappings_in_value():
     ]
     keys = get_required_keys_from_conditions(conditions)
     assert keys == {"location"}
+
+
+def test_a_rule_without_an_id_is_a_rule_error():
+    """It used to surface as a bare KeyError, which named nothing useful."""
+    with pytest.raises(InvalidRuleError, match="id"):
+        to_tag_rule({"or": [{"key": "language", "value": "python"}]})

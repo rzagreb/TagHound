@@ -28,32 +28,32 @@ def df() -> pd.DataFrame:
     return pd.DataFrame(
         [
             {
-                "description": "working on government contract",
-                "title": "data scientist",
-                "location": "Washington",
-                "clearance_required": False,
-                "clearance_level": "",
+                "memo": "annual renewal processed",
+                "merchant": "blue bottle",
+                "city": "Portland",
+                "recurring": False,
+                "plan": "",
             },
             {
-                "description": "private sector project",
-                "title": "senior analyst",
-                "location": "San Francisco",
-                "clearance_required": True,
-                "clearance_level": "Top Secret",
+                "memo": "one-off purchase",
+                "merchant": "corner grocer",
+                "city": "Denver",
+                "recurring": True,
+                "plan": "Annual",
             },
             {
-                "description": "public sector analysis",
-                "title": "intern",
-                "location": "New York",
-                "clearance_required": True,
-                "clearance_level": "Confidential",
+                "memo": "auto-renew notice",
+                "merchant": "city transit",
+                "city": "Seattle",
+                "recurring": True,
+                "plan": "Monthly",
             },
             {
-                "description": "public sector and government contract",
-                "title": "junior developer",
-                "location": "Washington",
-                "clearance_required": False,
-                "clearance_level": "",
+                "memo": "annual renewal and auto-renew",
+                "merchant": "corner grocer",
+                "city": "Portland",
+                "recurring": False,
+                "plan": "",
             },
         ]
     )
@@ -65,9 +65,9 @@ def test_create_vector_function_or(df: pd.DataFrame):
             {
                 LogicalOperator.AND.value: [
                     {
-                        ComparisonKey.KEY.value: "description",
+                        ComparisonKey.KEY.value: "memo",
                         ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
-                        ComparisonKey.VALUE.value: "(?:government contract|public sector)",
+                        ComparisonKey.VALUE.value: "(?:annual renewal|auto-renew)",
                     }
                 ]
             }
@@ -85,14 +85,14 @@ def test_create_vector_function_and(df: pd.DataFrame):
             {
                 LogicalOperator.AND.value: [
                     {
-                        ComparisonKey.KEY.value: "description",
+                        ComparisonKey.KEY.value: "memo",
                         ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
-                        ComparisonKey.VALUE.value: "(?:government contract|public sector)",
+                        ComparisonKey.VALUE.value: "(?:annual renewal|auto-renew)",
                     },
                     {
-                        ComparisonKey.KEY.value: "location",
+                        ComparisonKey.KEY.value: "city",
                         ComparisonKey.OPERATOR.value: ComparisonOperator.IN.value,
-                        ComparisonKey.VALUE.value: ["Washington", "New York"],
+                        ComparisonKey.VALUE.value: ["Portland", "Seattle"],
                     },
                 ]
             }
@@ -107,72 +107,72 @@ def test_create_vector_function_and(df: pd.DataFrame):
 def test_apply_condition_regex_match(df: pd.DataFrame):
     result = _make_series_condition(
         df,
-        "description",
+        "memo",
         ComparisonOperator.REGEX_MATCH.value,
-        "(?:government contract|public sector)",
+        "(?:annual renewal|auto-renew)",
         merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
     )
-    expected = pd.Series([True, False, True, True], name="description")
+    expected = pd.Series([True, False, True, True], name="memo")
     pd.testing.assert_series_equal(result, expected)
 
 
 def test_apply_condition_regex_not_match(df: pd.DataFrame):
     result = _make_series_condition(
         df,
-        "description",
+        "memo",
         ComparisonOperator.REGEX_NOT_MATCH.value,
-        "(?:government contract|public sector)",
+        "(?:annual renewal|auto-renew)",
         merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
     )
-    expected = pd.Series([False, True, False, False], name="description")
+    expected = pd.Series([False, True, False, False], name="memo")
     pd.testing.assert_series_equal(result, expected)
 
 
 def test_apply_condition_equal(df: pd.DataFrame):
     result = _make_series_condition(
         df,
-        "clearance_required",
+        "recurring",
         ComparisonOperator.EQUAL.value,
         False,
         merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
     )
-    expected = pd.Series([True, False, False, True], name="clearance_required")
+    expected = pd.Series([True, False, False, True], name="recurring")
     pd.testing.assert_series_equal(result, expected)
 
 
 def test_apply_condition_not_equal(df: pd.DataFrame):
     result = _make_series_condition(
         df,
-        "clearance_required",
+        "recurring",
         ComparisonOperator.NOT_EQUAL.value,
         False,
         merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
     )
-    expected = pd.Series([False, True, True, False], name="clearance_required")
+    expected = pd.Series([False, True, True, False], name="recurring")
     pd.testing.assert_series_equal(result, expected)
 
 
 def test_apply_condition_in(df: pd.DataFrame):
     result = _make_series_condition(
         df,
-        "location",
+        "city",
         ComparisonOperator.IN.value,
-        ["Washington", "New York"],
+        ["Portland", "Seattle"],
         merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
     )
-    expected = pd.Series([True, False, True, True], name="location")
+    expected = pd.Series([True, False, True, True], name="city")
     pd.testing.assert_series_equal(result, expected)
 
 
 def test_apply_condition_not_in(df: pd.DataFrame):
     result = _make_series_condition(
         df,
-        "location",
+        "city",
         ComparisonOperator.NOT_IN.value,
-        ["Washington", "New York"],
+        ["Portland", "Seattle"],
         merge_pattern=DEFAULT_REGEX_MERGE_PATTERN,
     )
-    expected = pd.Series([False, True, False, False], name="location")
+    expected = pd.Series([False, True, False, False], name="city")
     pd.testing.assert_series_equal(result, expected)
 
 
@@ -193,8 +193,8 @@ def test_evaluate_criteria_missing_op_defaults_to_equal(df: pd.DataFrame):
     rule = {
         LogicalOperator.AND.value: [
             {
-                ComparisonKey.KEY.value: "location",
-                ComparisonKey.VALUE.value: "Washington",
+                ComparisonKey.KEY.value: "city",
+                ComparisonKey.VALUE.value: "Portland",
             }
         ]
     }
@@ -207,14 +207,14 @@ def test_evaluate_criteria_or(df: pd.DataFrame):
     rule = {
         LogicalOperator.OR.value: [
             {
-                ComparisonKey.KEY.value: "description",
+                ComparisonKey.KEY.value: "memo",
                 ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
-                ComparisonKey.VALUE.value: "(?:government contract|public sector)",
+                ComparisonKey.VALUE.value: "(?:annual renewal|auto-renew)",
             },
             {
-                ComparisonKey.KEY.value: "location",
+                ComparisonKey.KEY.value: "city",
                 ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
-                ComparisonKey.VALUE.value: "San Francisco",
+                ComparisonKey.VALUE.value: "Denver",
             },
         ]
     }
@@ -227,14 +227,14 @@ def test_evaluate_criteria_and(df: pd.DataFrame):
     rule = {
         LogicalOperator.AND.value: [
             {
-                ComparisonKey.KEY.value: "description",
+                ComparisonKey.KEY.value: "memo",
                 ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
-                ComparisonKey.VALUE.value: "(?:government contract|public sector)",
+                ComparisonKey.VALUE.value: "(?:annual renewal|auto-renew)",
             },
             {
-                ComparisonKey.KEY.value: "location",
+                ComparisonKey.KEY.value: "city",
                 ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
-                ComparisonKey.VALUE.value: "Washington",
+                ComparisonKey.VALUE.value: "Portland",
             },
         ]
     }
@@ -245,7 +245,7 @@ def test_evaluate_criteria_and(df: pd.DataFrame):
 
 def test_evaluate_criteria_invalid(df: pd.DataFrame):
     rule = {
-        ComparisonKey.KEY.value: "description",
+        ComparisonKey.KEY.value: "memo",
         ComparisonKey.OPERATOR.value: ComparisonOperator.EQUAL.value,
     }
     with pytest.raises(ValueError):
@@ -267,12 +267,12 @@ def punctuation_df() -> pd.DataFrame:
     """
     return pd.DataFrame(
         {
-            "description": pd.Series(
+            "memo": pd.Series(
                 [
-                    "we use C++ and rust here",
-                    "experience with C# and .NET",
-                    "great benefits. #LI-Remote",
-                    "python developer wanted",
+                    "C++ toolkit, 3 licences",
+                    "C# and .NET bundle renewal",
+                    "spring sale. #promo",
+                    "python course, annual",
                     "no signal in this one",
                 ],
                 dtype="string[pyarrow]",
@@ -286,7 +286,7 @@ def punctuation_df() -> pd.DataFrame:
     [
         (r"C\+\+", [True, False, False, False, False]),
         (r"C\#", [False, True, False, False, False]),
-        (r"\#LI-Remote", [False, False, True, False, False]),
+        (r"\#promo", [False, False, True, False, False]),
         (r"\.?net", [False, True, False, False, False]),
     ],
 )
@@ -294,17 +294,17 @@ def test_re2_safe_merge_pattern_matches_punctuation_edges(
     punctuation_df: pd.DataFrame, pattern: str, expected: list[bool]
 ):
     condition = {
-        ComparisonKey.KEY.value: "description",
+        ComparisonKey.KEY.value: "memo",
         ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
         ComparisonKey.VALUE.value: pattern,
     }
     result = _evaluate_criteria(
         punctuation_df, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN
     )
-    pd.testing.assert_series_equal(result, pd.Series(expected, name="description"))
+    pd.testing.assert_series_equal(result, pd.Series(expected, name="memo"))
 
 
-@pytest.mark.parametrize("pattern", [r"C\+\+", r"C\#", r"\#LI-Remote", "python"])
+@pytest.mark.parametrize("pattern", [r"C\+\+", r"C\#", r"\#promo", "python"])
 def test_re2_safe_merge_pattern_agrees_with_lookaround_default(
     punctuation_df: pd.DataFrame, pattern: str
 ):
@@ -314,11 +314,11 @@ def test_re2_safe_merge_pattern_agrees_with_lookaround_default(
     object-dtype frame, where pandas falls back to Python `re`.
     """
     condition = {
-        ComparisonKey.KEY.value: "description",
+        ComparisonKey.KEY.value: "memo",
         ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
         ComparisonKey.VALUE.value: pattern,
     }
-    object_df = punctuation_df.astype({"description": "object"})
+    object_df = punctuation_df.astype({"memo": "object"})
     lookaround = _evaluate_criteria(
         object_df, condition, merge_pattern=DEFAULT_REGEX_MERGE_PATTERN
     )
@@ -332,12 +332,74 @@ def test_word_bounded_pattern_is_not_over_matched(punctuation_df: pd.DataFrame):
     """`python` must not match inside `micropython` under the RE2-safe boundaries."""
     punctuation_df.loc[len(punctuation_df)] = "micropython only shop"
     condition = {
-        ComparisonKey.KEY.value: "description",
+        ComparisonKey.KEY.value: "memo",
         ComparisonKey.OPERATOR.value: ComparisonOperator.REGEX_MATCH.value,
         ComparisonKey.VALUE.value: "python",
     }
     result = _evaluate_criteria(
         punctuation_df, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN
     )
-    expected = pd.Series([False, False, False, True, False, False], name="description")
+    expected = pd.Series([False, False, False, True, False, False], name="memo")
     pd.testing.assert_series_equal(result, expected)
+
+
+# --- Missing values ---------------------------------------------------------
+#
+# The regex branch has resolved nulls to "no match" since 0.3.0; these pin the
+# same behaviour on the branches that were left leaking NA into the masks.
+
+NULL_ROW = 1
+"""Index of the missing value in the fixtures below."""
+
+
+@pytest.mark.parametrize("dtype", ["Int64", "float64", "object"])
+@pytest.mark.parametrize(
+    ("operator", "value", "expected"),
+    [
+        (">", 100, [False, False, True]),
+        (">=", 420, [False, False, True]),
+        ("<", 100, [True, False, False]),
+        ("in", [420], [False, False, True]),
+        ("not_in", [420], [True, True, False]),
+        ("=", 420, [False, False, True]),
+        ("!=", 420, [True, True, False]),
+    ],
+)
+def test_a_missing_number_is_not_a_match(dtype, operator, value, expected):
+    frame = pd.DataFrame({"amount": pd.Series([5, None, 420], dtype=dtype)})
+    condition = {
+        ComparisonKey.KEY.value: "amount",
+        ComparisonKey.OPERATOR.value: operator,
+        ComparisonKey.VALUE.value: value,
+    }
+    result = _evaluate_criteria(
+        frame, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN
+    )
+    assert list(result) == expected
+    # The and/or masks and the final to_numpy(dtype=bool) both refuse NA.
+    assert result.dtype == bool
+
+
+@pytest.mark.parametrize("dtype", ["string[pyarrow]", "object"])
+@pytest.mark.parametrize(
+    ("operator", "value", "expected"),
+    [
+        ("=", "a", [True, False]),
+        ("!=", "a", [False, True]),
+        ("in", ["a"], [True, False]),
+        ("~", "a", [True, False]),
+        ("!~", "a", [False, True]),
+    ],
+)
+def test_a_missing_string_is_not_a_match(dtype, operator, value, expected):
+    frame = pd.DataFrame({"merchant": pd.Series(["a", None], dtype=dtype)})
+    condition = {
+        ComparisonKey.KEY.value: "merchant",
+        ComparisonKey.OPERATOR.value: operator,
+        ComparisonKey.VALUE.value: value,
+    }
+    result = _evaluate_criteria(
+        frame, condition, merge_pattern=RE2_SAFE_REGEX_MERGE_PATTERN
+    )
+    assert list(result) == expected
+    assert result.dtype == bool

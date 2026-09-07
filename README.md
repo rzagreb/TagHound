@@ -6,7 +6,7 @@ Rules stay readable and editable by non-technical users, while your pipeline cod
 
 - **Categorize bank transactions** — regex rules on merchant strings turn a CSV export into budget categories, no ML training required
 - **Triage tickets and log events** — keyword and threshold rules attach routing tags (severity, team, topic) to each incoming record
-- **Enrich scraped datasets** — bulk-tag job postings or product listings in a pandas pipeline, then rank matches by rule weights
+- **Enrich scraped datasets** — bulk-tag product listings or catalogue exports in a pandas pipeline, then rank matches by rule weights
 
 ## Installation
 
@@ -108,6 +108,28 @@ print(th.find_tags_using_vector(df))
 
 The tags column is added to the input DataFrame in place; rename it with `output_column_name=`. Alternatively, `output_format="columns"` returns a copy with one boolean column per rule (`food/coffee`, `alerts/big-purchase`) — handy for filtering and aggregation.
 
+### Text columns, dtypes and RE2
+
+Cast the text columns your rules match on to `string[pyarrow]`:
+
+```python
+df["merchant"] = df["merchant"].astype("string[pyarrow]")
+```
+
+That is what makes `~` run as one vectorised pass instead of a Python-level loop, and on a large frame it is most of the runtime.
+
+The trade-off is the regex engine. pyarrow-backed columns match with **RE2**, which does not support look-ahead, look-behind, backreferences or atomic groups. TagHound rejects those when a rule is built, so you find out at load time rather than mid-batch:
+
+```python
+to_tag_rule({"id": "r", "or": [{"key": "merchant", "op": "~", "value": "(?<!micro)python"}]})
+# RE2UnsupportedError: `(?<!micro)python` uses negative look-behind `(?<!`, ...
+```
+
+Word boundaries are applied for you, so patterns rarely need this: `python` will not match inside `micropython`, and unlike `\b` the boundaries still work for patterns that start or end with punctuation (`C\+\+`, `\#promo`). Write `data\w*` to match `database`.
+
+Missing values are never a match. A null cell is `False` for `~`, `=`, `>` and `in`, and therefore `True` for their negations (`!~`, `!=`, `not_in`) — "this cell does not mention X" holds when there is no cell.
+
+
 ## Scoring and labeling matches
 
 Rule weights and labels are exposed as maps, so ranking matched records is a couple of lines:
@@ -143,6 +165,17 @@ th = TagHound(rules=rules)
 ```
 
 JSON works the same as YAML with an identical structure: `TagHound.rules_from_json("rules.json")`.
+
+Rules that live somewhere other than a file — a database table, an upload — load from text and write back out again:
+
+```python
+from taghound.serializers import dump_rules
+
+th = TagHound.rules_from_string(yaml_text)
+yaml_text = dump_rules([rule.data for rule in th.rules])
+```
+
+`dump_rules` quotes every pattern and never folds a long line, so a regex cannot silently change meaning on a round trip.
 
 ## Example
 

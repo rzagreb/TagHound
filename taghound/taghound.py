@@ -12,6 +12,7 @@ from taghound.constants import (
     DEFAULT_REGEX_MERGE_PATTERN,
     RE2_SAFE_REGEX_MERGE_PATTERN,
 )
+from taghound.exceptions import DuplicateRuleIdError
 from taghound.models import TagRule
 from taghound.serializers import to_tag_rule
 
@@ -223,6 +224,18 @@ class TagHound:
             )
             for rule in data
         ]
+
+        seen: set[str] = set()
+        for rule in rules:
+            if rule.id in seen:
+                raise DuplicateRuleIdError(
+                    f"`{rule.id}` appears twice. An id is what a rule is keyed on, "
+                    "so only one of the two would survive: the weight and label "
+                    "maps keep the last, and `output_format='columns'` emits the "
+                    "id twice."
+                )
+            seen.add(rule.id)
+
         return cls(rules=rules)
 
     @classmethod
@@ -254,6 +267,44 @@ class TagHound:
         data = yaml.safe_load(Path(filepath).read_text())
         return cls._from_rule_dicts(
             data,
+            version=version,
+            add_scalar_func=add_scalar_func,
+            add_vector_fn=add_vector_fn,
+            merge_pattern=merge_pattern,
+            vector_merge_pattern=vector_merge_pattern,
+        )
+
+    @classmethod
+    def rules_from_string(
+        cls,
+        text: str,
+        version: str = "1",
+        add_scalar_func: bool = True,
+        add_vector_fn: bool = True,
+        merge_pattern: str = DEFAULT_REGEX_MERGE_PATTERN,
+        vector_merge_pattern: str = RE2_SAFE_REGEX_MERGE_PATTERN,
+    ) -> TagHound:
+        """Load rules from YAML text, for rules that never were a file.
+
+        The counterpart to `taghound.serializers.dump_rules`, and what to use
+        when the rules arrive from a database row or an upload.
+
+        Args:
+            text (str): The YAML document holding the rules
+            version (str): The version of the file format
+            add_scalar_func (bool): Whether to add scalar functions to the rules
+            add_vector_fn (bool): Whether to add vector functions to the rules
+            merge_pattern (str): The merge pattern for the scalar path
+            vector_merge_pattern (str): The merge pattern for the vectorized
+                path. Must be RE2-safe.
+
+        Returns:
+            TagHound: A TagHound object with the rules read from the text
+        """
+        import yaml
+
+        return cls._from_rule_dicts(
+            yaml.safe_load(text),
             version=version,
             add_scalar_func=add_scalar_func,
             add_vector_fn=add_vector_fn,
